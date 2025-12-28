@@ -1,10 +1,9 @@
 pub mod utils;
-pub mod runtime_data;
 
 use core::fmt;
 use std::{ fmt::Error, sync::atomic::Ordering };
 
-use crate::{ PluginImplementationParams, console::ConsoleSender, runtime::runtime_data::RuntimeData};
+use crate::{ PluginImplementationParams, console::ConsoleSender};
 use nih_plug::{ prelude::* };
 use utils::{ RMS, Timer };
 use ebur128::{ EbuR128, Mode };
@@ -15,7 +14,6 @@ pub struct Runtime {
     sample_rate: f32,
     buffer_size: usize,
     channels: usize,
-    meter_id: usize,
     last_playing: bool,
 
     active_time: Timer,
@@ -37,7 +35,6 @@ impl Runtime {
             sample_rate: 0.0,
             buffer_size: 0,
             channels: 0,
-            meter_id: 0,
             last_playing: false,
 
             active_time: Timer::new(),
@@ -89,13 +86,13 @@ impl Runtime {
         }
         self.last_playing = transport.playing;
 
-        if params.reset_meter.load(Ordering::SeqCst) {
+        if params.reset_meter.load(Ordering::Relaxed) {
             match self.reset_meter() {
                 Ok(()) => (),
                 Err(e) => self.log(format!("Couldn't refresh EbuR128: {}", e))
             }
 
-            params.reset_meter.store(false, Ordering::SeqCst);
+            params.reset_meter.store(false, Ordering::Relaxed);
         }
 
         match self.run_ebur128(buffer) {
@@ -114,20 +111,7 @@ impl Runtime {
         }
 
         self.run_time.process( execute_timer.elapsed_ms(), self.sample_rate);
-    }
-
-    pub fn update_runtime_data(&mut self, runtime_data: &mut RuntimeData) {
-        runtime_data.sample_rate = self.sample_rate;
-        runtime_data.buffer_size = self.buffer_size;
-        runtime_data.channels = self.channels;
-        runtime_data.run_ms = self.run_time.get();
-
-        runtime_data.active_time_ms = self.active_time.elapsed_ms();
-
-        runtime_data.lufs_global_loudness = self.lufs_global_loudness;
-        runtime_data.lufs_momentary_loudness = self.lufs_momentary_loudness;
-        runtime_data.lufs_range_loudness = self.lufs_range_loudness;
-        runtime_data.lufs_shortterm_loudness = self.lufs_shortterm_loudness;
+        self.update_values(params);
     }
 
     fn run_ebur128(&mut self, buffer: &mut Buffer) -> Result<(), ebur128::Error> {
@@ -159,6 +143,18 @@ impl Runtime {
         self.lufs_shortterm_loudness = ebur128.loudness_shortterm()?;
 
         Ok(())
+    }
+
+    pub fn update_values(&mut self, params: &PluginImplementationParams) {
+        params.sample_rate.store(self.sample_rate, Ordering::Relaxed);
+        params.buffer_size.store(self.buffer_size, Ordering::Relaxed);
+        params.channels.store(self.channels, Ordering::Relaxed);
+        params.run_ms.store(self.run_time.get(), Ordering::Relaxed);
+        params.active_time_ms.store(self.active_time.elapsed_ms(), Ordering::Relaxed);
+        params.lufs_global_loudness.store(self.lufs_global_loudness, Ordering::Relaxed);
+        params.lufs_momentary_loudness.store(self.lufs_momentary_loudness, Ordering::Relaxed);
+        params.lufs_range_loudness.store(self.lufs_range_loudness, Ordering::Relaxed);
+        params.lufs_shortterm_loudness.store(self.lufs_shortterm_loudness, Ordering::Relaxed);
     }
 
     fn reset_meter(&mut self) -> Result<(), ebur128::Error>  {

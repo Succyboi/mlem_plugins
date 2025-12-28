@@ -4,7 +4,7 @@ authors = [
     "Puk Bruinsma / DJ ZITwerK <puk@mlemrecords.com>"
     ]
 homepage = "https://mlemrecords.com"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "An audio meter."
 license-file = "LICENSE"
@@ -17,4 +17,5 @@ path = "src/lib.rs"
 nih_plug = { git = "https://github.com/robbert-vdh/nih-plug", features = ["standalone", "vst3"] }
 nih_plug_egui = { git = "https://github.com/robbert-vdh/nih-plug" }
 ebur128 = "0.1.10"
+atomic_float = "1.1.0"
 mlem_egui_themes = { path = "../mlem_egui_themes" }

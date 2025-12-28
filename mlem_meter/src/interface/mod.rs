@@ -5,7 +5,7 @@ use std::{ hash::Hash, sync::{ Arc, RwLock, atomic::Ordering } };
 use mlem_egui_themes::Theme;
 use nih_plug::{ prelude::*, util::gain_to_db };
 use nih_plug_egui::{ EguiState, egui::{ self, Align, Context, Layout, Ui } };
-use crate::{ ConsoleReceiver, PluginImplementationParams, RuntimeData, consts, interface::interface_utils::{help_label, parameter_grid, parameter_label} };
+use crate::{ ConsoleReceiver, PluginImplementationParams, consts, interface::interface_utils::{help_label, parameter_grid, parameter_label} };
 
 const DEFAULT_SPACE: f32 = 4.0;
 const LABEL_WIDTH: f32 = 64.0;
@@ -46,12 +46,10 @@ impl Interface {
         };
     }
 
-    pub fn create_interface(self, editor_state: Arc<EguiState>, params: Arc<PluginImplementationParams>, runtime_data_lock: Arc<RwLock<RuntimeData>>) -> Option<Box<dyn Editor>> {
+    pub fn create_interface(self, editor_state: Arc<EguiState>, params: Arc<PluginImplementationParams>) -> Option<Box<dyn Editor>> {
         let interface_lock = Arc::from(RwLock::from(self));
         let interface_lock_build = interface_lock.clone();
         let interface_lock_update = interface_lock.clone();
-        let runtime_data_lock_build = runtime_data_lock.clone();
-        let runtime_data_lock_update = runtime_data_lock.clone();
         let params_build = params.clone();
         let params_update = params.clone();
 
@@ -61,21 +59,19 @@ impl Interface {
             move |egui_ctx, _state| {
                 let params_build = params_build.clone();
                 let interface = interface_lock_build.clone();
-                let runtime_data = runtime_data_lock_build.clone();
 
-                interface.write().unwrap().build_interface(egui_ctx, _state, params_build, runtime_data);
+                interface.write().unwrap().build_interface(egui_ctx, _state, params_build);
             },
             move |egui_ctx, _setter, _state| {
                 let params_update = params_update.clone();
                 let interface = interface_lock_update.clone();
-                let runtime_data = runtime_data_lock_update.clone();
 
-                interface.write().unwrap().draw_interface(egui_ctx, _setter, _state, params_update, runtime_data);
+                interface.write().unwrap().draw_interface(egui_ctx, _setter, _state, params_update);
             },
         );
     }
 
-    fn build_interface(&mut self, egui_ctx: &Context, _state: &mut (), _params: Arc<PluginImplementationParams>, _runtime_data: Arc<RwLock<RuntimeData>>) {
+    fn build_interface(&mut self, egui_ctx: &Context, _state: &mut (), _params: Arc<PluginImplementationParams>) {
         mlem_egui_themes::set_theme(egui_ctx, self.get_theme());
 
         self.console.log(format!("{name} \"{description}\" v{version} {build_type} ({id}).", name = consts::NAME, description = consts::DESCRIPTION, version = consts::VERSION, build_type = consts::BUILD_TYPE, id = consts::BUILD_ID));
@@ -83,9 +79,7 @@ impl Interface {
         self.console.log(format!("{}", consts::MOTD));
     }
     
-    fn draw_interface(&mut self, egui_ctx: &Context, _setter: &ParamSetter, _state: &mut (), _params: Arc<PluginImplementationParams>, runtime_data: Arc<RwLock<RuntimeData>>) {    
-        let runtime_data = runtime_data.read().unwrap().clone();
-
+    fn draw_interface(&mut self, egui_ctx: &Context, _setter: &ParamSetter, _state: &mut (), _params: Arc<PluginImplementationParams>) {    
         egui::TopBottomPanel::top(TOP_ID).show(egui_ctx, |ui| {
             ui.horizontal(|ui| {
                 self.draw_about_button(ui);
@@ -99,7 +93,7 @@ impl Interface {
         });
 
         egui::CentralPanel::default().show(egui_ctx, |ui| {
-            self.draw_center(ui, _setter, _params, &runtime_data);
+            self.draw_center(ui, _setter, _params);
         });
     }
     
@@ -158,40 +152,40 @@ impl Interface {
         });
     }
 
-    fn draw_center(&mut self, ui: &mut Ui, _setter: &ParamSetter, _params: Arc<PluginImplementationParams>, runtime_data: &RuntimeData) {
+    fn draw_center(&mut self, ui: &mut Ui, setter: &ParamSetter, params: Arc<PluginImplementationParams>) {
         match self.center_view {
             InterfaceCenterView::About => self.draw_about(ui),
-            InterfaceCenterView::Console => self.draw_console(ui, runtime_data, CONSOLE_MAIN_ID),
-            InterfaceCenterView::Plugin => self.draw_plugin(ui, _setter, _params, runtime_data),
+            InterfaceCenterView::Console => self.draw_console(ui, setter, params, CONSOLE_MAIN_ID),
+            InterfaceCenterView::Plugin => self.draw_plugin(ui, setter, params),
         }
     }
 
-    fn draw_plugin(&mut self, ui: &mut Ui, setter: &ParamSetter, params: Arc<PluginImplementationParams>, runtime_data: &RuntimeData) {
+    fn draw_plugin(&mut self, ui: &mut Ui, setter: &ParamSetter, params: Arc<PluginImplementationParams>) {
         parameter_grid(ui, "Meters", |ui| {
             parameter_label(ui, "Integrated", "Loudness total since reset.", |ui| {
-                ui.monospace(format!("{: >6.2} lufs", runtime_data.lufs_global_loudness));
+                ui.monospace(format!("{: >6.2} lufs", params.lufs_global_loudness.load(Ordering::Relaxed)));
             });
 
             parameter_label(ui, "Momentary", "Loudness over a duration of 0.4 seconds.", |ui| {
-                ui.monospace(format!("{: >6.2} lufs", runtime_data.lufs_momentary_loudness));
+                ui.monospace(format!("{: >6.2} lufs", params.lufs_momentary_loudness.load(Ordering::Relaxed)));
             });
 
             parameter_label(ui, "Short Term", "Loudness over a duration of 3 seconds.", |ui| {
-                ui.monospace(format!("{: >6.2} lufs", runtime_data.lufs_shortterm_loudness));
+                ui.monospace(format!("{: >6.2} lufs", params.lufs_shortterm_loudness.load(Ordering::Relaxed)));
             });
 
             parameter_label(ui, "Range", "Loudness range total since reset.", |ui| {
-                ui.monospace(format!("{: >6.2} lufs", runtime_data.lufs_range_loudness));
+                ui.monospace(format!("{: >6.2} lufs", params.lufs_range_loudness.load(Ordering::Relaxed)));
             });
         });
         
         ui.add_space(ui.available_height() - 12.0);
         ui.horizontal(|ui| {
-            let seconds = runtime_data.active_time_ms / 1000.0;
+            let seconds = params.active_time_ms.load(Ordering::Relaxed) / 1000.0;
             let minutes = f32::floor(seconds / 60.0);
             
             if ui.button("Reset").clicked() {
-                params.reset_meter.store(true, Ordering::SeqCst);
+                params.reset_meter.store(true, Ordering::Relaxed);
             }
             ui.monospace(format!("{minutes: >1.0}m{seconds: >1.0}s", minutes = minutes, seconds = seconds - minutes * 60.0));
             
@@ -207,16 +201,16 @@ impl Interface {
         });
     }
 
-    fn draw_console(&mut self, ui: &mut Ui, runtime_data: &RuntimeData, hash: impl Hash) {        
+    fn draw_console(&mut self, ui: &mut Ui, setter: &ParamSetter, params: Arc<PluginImplementationParams>, hash: impl Hash) {        
         ui.vertical(|ui| {
             ui.horizontal(|ui| {
-                let load = (runtime_data.run_ms / (runtime_data.buffer_size as f32 / runtime_data.sample_rate * 1000.0) * 100.0).floor();
+                let load = (params.run_ms.load(Ordering::Relaxed) / (params.buffer_size.load(Ordering::Relaxed) as f32 / params.sample_rate.load(Ordering::Relaxed) * 1000.0) * 100.0).floor();
                 let status = format!("({ms:.2}ms / {load:>3}%) @ {rate}hz, {buff}buf, {channels}ch.", 
-                    ms = runtime_data.run_ms,
+                    ms = params.run_ms.load(Ordering::Relaxed),
                     load = load, 
-                    rate = runtime_data.sample_rate,
-                    buff = runtime_data.buffer_size,
-                    channels = runtime_data.channels);
+                    rate = params.sample_rate.load(Ordering::Relaxed),
+                    buff = params.buffer_size.load(Ordering::Relaxed),
+                    channels = params.channels.load(Ordering::Relaxed));
         
                     ui.monospace(format!("{}", status));
             });

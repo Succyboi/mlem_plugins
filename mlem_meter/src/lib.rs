@@ -3,25 +3,35 @@ pub mod runtime;
 pub mod interface;
 pub mod console;
 
+use atomic_float::{ AtomicF32, AtomicF64 };
 use console::ConsoleReceiver;
-use runtime::{ Runtime, runtime_data::RuntimeData };
+use runtime::{ Runtime };
 use interface::{ Interface };
 use nih_plug::prelude::*;
-use std::sync::{ Arc, RwLock, atomic::AtomicBool };
+use std::sync::{ Arc, RwLock, atomic::{AtomicBool, AtomicUsize} };
 use nih_plug_egui::EguiState;
 
 pub struct PluginImplementation {
     runtime: Runtime,
-    params: Arc<PluginImplementationParams>,
-    runtime_data: Arc<RwLock<RuntimeData>>,
+    params: Arc<PluginImplementationParams>
 }
 
 #[derive(Params)]
 pub struct PluginImplementationParams {
     #[persist = "editor-state"] editor_state: Arc<EguiState>,
     #[id = "reset_on_play"]     reset_on_play: BoolParam,
+    
+    reset_meter: AtomicBool,
+    sample_rate: AtomicF32,
+    buffer_size: AtomicUsize,
+    channels: AtomicUsize,
+    run_ms: AtomicF32,
 
-    reset_meter: AtomicBool
+    active_time_ms: AtomicF32,
+    lufs_global_loudness: AtomicF64,
+    lufs_momentary_loudness: AtomicF64,
+    lufs_range_loudness: AtomicF64,
+    lufs_shortterm_loudness: AtomicF64
 }
 
 impl Default for PluginImplementation {
@@ -30,8 +40,7 @@ impl Default for PluginImplementation {
 
         Self {
             runtime: runtime,
-            params: Arc::new(PluginImplementationParams::default()),
-            runtime_data: Arc::from(RwLock::new(RuntimeData::new())),
+            params: Arc::new(PluginImplementationParams::default())
         }
     }
 }
@@ -42,7 +51,17 @@ impl Default for PluginImplementationParams {
             editor_state: EguiState::from_size(consts::WINDOW_SIZE_WIDTH, consts::WINDOW_SIZE_HEIGHT),
             reset_on_play: BoolParam::new("Reset On Play", true),
 
-            reset_meter: AtomicBool::new(false)
+            reset_meter: AtomicBool::new(false),
+            sample_rate: AtomicF32::new(0.0),
+            buffer_size: AtomicUsize::new(0),
+            channels: AtomicUsize::new(0),
+            run_ms: AtomicF32::new(0.0),
+
+            active_time_ms: AtomicF32::new(0.0),
+            lufs_global_loudness: AtomicF64::new(0.0),
+            lufs_momentary_loudness: AtomicF64::new(0.0),
+            lufs_range_loudness: AtomicF64::new(0.0),
+            lufs_shortterm_loudness: AtomicF64::new(0.0)
         }
     }
 }
@@ -81,11 +100,10 @@ impl Plugin for PluginImplementation {
     fn editor(&mut self, _async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
         let editor_state = self.params.editor_state.clone();
         let params = self.params.clone();
-        let runtime_status = self.runtime_data.clone();
         let interface = Interface::new();
         
         self.runtime.console = Some(interface.console.create_sender());
-        let editor = interface.create_interface(editor_state, params, runtime_status);
+        let editor = interface.create_interface(editor_state, params);
 
         return editor;
     }
@@ -102,9 +120,6 @@ impl Plugin for PluginImplementation {
     }
 
     fn reset(&mut self) {
-        let runtime_data_lock = self.runtime_data.clone();
-        let mut runtime_data = runtime_data_lock.write().unwrap();
-
         self.runtime.reset();
     }
 
@@ -114,8 +129,6 @@ impl Plugin for PluginImplementation {
         _aux: &mut AuxiliaryBuffers,
         context: &mut impl ProcessContext<Self>,
     ) -> ProcessStatus {
-        let runtime_data_lock = self.runtime_data.clone();
-        let mut runtime_data = runtime_data_lock.write().unwrap();
         let params = self.params.clone();
 
         self.runtime.run(buffer, &params, context.transport());
