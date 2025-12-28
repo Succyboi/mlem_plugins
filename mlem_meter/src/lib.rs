@@ -5,25 +5,23 @@ pub mod console;
 
 use console::ConsoleReceiver;
 use runtime::{ Runtime, runtime_data::RuntimeData };
-use interface::{ interface_data::InterfaceData, Interface };
+use interface::{ Interface };
 use nih_plug::prelude::*;
-use std::sync::{ Arc, RwLock };
+use std::sync::{ Arc, RwLock, atomic::AtomicBool };
 use nih_plug_egui::EguiState;
 
 pub struct PluginImplementation {
     runtime: Runtime,
     params: Arc<PluginImplementationParams>,
     runtime_data: Arc<RwLock<RuntimeData>>,
-    interface_data: Arc<RwLock<InterfaceData>>
 }
 
 #[derive(Params)]
 pub struct PluginImplementationParams {
-    #[persist = "editor-state"]
-    editor_state: Arc<EguiState>,
+    #[persist = "editor-state"] editor_state: Arc<EguiState>,
+    #[id = "reset_on_play"]     reset_on_play: BoolParam,
 
-    #[id = "reset_on_play"]
-    reset_on_play: BoolParam,
+    reset_meter: AtomicBool
 }
 
 impl Default for PluginImplementation {
@@ -34,7 +32,6 @@ impl Default for PluginImplementation {
             runtime: runtime,
             params: Arc::new(PluginImplementationParams::default()),
             runtime_data: Arc::from(RwLock::new(RuntimeData::new())),
-            interface_data: Arc::from(RwLock::new(InterfaceData::new()))
         }
     }
 }
@@ -43,8 +40,9 @@ impl Default for PluginImplementationParams {
     fn default() -> Self {
         Self {
             editor_state: EguiState::from_size(consts::WINDOW_SIZE_WIDTH, consts::WINDOW_SIZE_HEIGHT),
+            reset_on_play: BoolParam::new("Reset On Play", true),
 
-            reset_on_play: BoolParam::new("Reset On Play", true)
+            reset_meter: AtomicBool::new(false)
         }
     }
 }
@@ -84,11 +82,10 @@ impl Plugin for PluginImplementation {
         let editor_state = self.params.editor_state.clone();
         let params = self.params.clone();
         let runtime_status = self.runtime_data.clone();
-        let interface_data = self.interface_data.clone();
         let interface = Interface::new();
         
         self.runtime.console = Some(interface.console.create_sender());
-        let editor = interface.create_interface(editor_state, params, runtime_status, interface_data);
+        let editor = interface.create_interface(editor_state, params, runtime_status);
 
         return editor;
     }
@@ -119,14 +116,9 @@ impl Plugin for PluginImplementation {
     ) -> ProcessStatus {
         let runtime_data_lock = self.runtime_data.clone();
         let mut runtime_data = runtime_data_lock.write().unwrap();
-        let interface_data = self.interface_data.read().unwrap().clone();
         let params = self.params.clone();
 
-        runtime_data.update_from_interface(&interface_data);
-
         self.runtime.run(buffer, &params, context.transport());
-        
-        runtime_data.update_from_runtime(&mut self.runtime, &interface_data);
 
         return ProcessStatus::Normal;
     }

@@ -2,7 +2,7 @@ pub mod utils;
 pub mod runtime_data;
 
 use core::fmt;
-use std::{ fmt::Error };
+use std::{ fmt::Error, sync::atomic::Ordering };
 
 use crate::{ PluginImplementationParams, console::ConsoleSender, runtime::runtime_data::RuntimeData};
 use nih_plug::{ prelude::* };
@@ -89,6 +89,14 @@ impl Runtime {
         }
         self.last_playing = transport.playing;
 
+        if params.reset_meter.load(Ordering::SeqCst) {
+            match self.reset_meter() {
+                Ok(()) => (),
+                Err(e) => self.log(format!("Couldn't refresh EbuR128: {}", e))
+            }
+
+            params.reset_meter.store(false, Ordering::SeqCst);
+        }
 
         match self.run_ebur128(buffer) {
             Ok(()) => (),
@@ -120,15 +128,6 @@ impl Runtime {
         runtime_data.lufs_momentary_loudness = self.lufs_momentary_loudness;
         runtime_data.lufs_range_loudness = self.lufs_range_loudness;
         runtime_data.lufs_shortterm_loudness = self.lufs_shortterm_loudness;
-
-        if runtime_data.meter_id != self.meter_id {
-            self.meter_id = runtime_data.meter_id;
-
-            match self.reset_meter() {
-                Ok(()) => (),
-                Err(e) => self.log(format!("Couldn't refresh EbuR128: {}", e))
-            }
-        }
     }
 
     fn run_ebur128(&mut self, buffer: &mut Buffer) -> Result<(), ebur128::Error> {
