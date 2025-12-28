@@ -77,7 +77,7 @@ impl ConsoleReceiver {
 
     pub fn update(&mut self) -> bool {
         let receiver = self.receiver.clone();
-        let receiver_lock = receiver.lock().unwrap(); // TODO FIX. HANGS EVERYTHING
+        let receiver_lock = receiver.lock().unwrap();
 
         let mut updated = false;
         for log in receiver_lock.try_iter() {
