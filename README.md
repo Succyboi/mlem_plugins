@@ -2,14 +2,18 @@
 
 ## Includes
 
-- [mlem_meter](mlem_meter) 0.1.0 - An audio meter.
-    - TODO RMS?
+- [mlem_meter](mlem_meter) 0.1.1 - An audio meter.
 - [lua_garden_plug](lua_garden_plug) - Total WIP
 
 ## Building
 
-Example:
+Current platform example:
 
 ```
 cargo xtask bundle mlem_meter --release
+```
+
+For windows:
+```
+cargo xtask bundle mlem_meter --release --target x86_64-pc-windows-gnu
 ```

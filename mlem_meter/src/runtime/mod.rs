@@ -111,7 +111,7 @@ impl Runtime {
         }
 
         self.run_time.process( execute_timer.elapsed_ms(), self.sample_rate);
-        self.update_values(params);
+        self.update_params(params);
     }
 
     fn run_ebur128(&mut self, buffer: &mut Buffer) -> Result<(), ebur128::Error> {
@@ -145,7 +145,7 @@ impl Runtime {
         Ok(())
     }
 
-    pub fn update_values(&mut self, params: &PluginImplementationParams) {
+    pub fn update_params(&mut self, params: &PluginImplementationParams) {
         params.sample_rate.store(self.sample_rate, Ordering::Relaxed);
         params.buffer_size.store(self.buffer_size, Ordering::Relaxed);
         params.channels.store(self.channels, Ordering::Relaxed);
