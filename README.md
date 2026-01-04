@@ -1,6 +1,6 @@
 # Mlem Plugins
 
-A playground for audio plugins developed in Rust. Mostly for my personal enjoyment. I'm happy to see anyone get use out of these though.
+A playground for audio plugins developed in Rust by [Mlem Records](https://mlemrecords.com/). Mostly for my personal enjoyment. I'm happy to see anyone get use out of these though.
 
 Plugins and their underlying code are licensed under the [ANTI-CAPITALIST SOFTWARE LICENSE (v 1.4)](LICENSE). If you need a different license, feel free to contact [puk@mlemrecords.com](mailto:puk@mlemrecords.com).
 
