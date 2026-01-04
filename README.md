@@ -4,6 +4,8 @@ A playground for audio plugins developed in Rust. Mostly for my personal enjoyme
 
 Plugins and their underlying code are licensed under the [ANTI-CAPITALIST SOFTWARE LICENSE (v 1.4)](LICENSE). If you need a different license, feel free to contact [puk@mlemrecords.com](mailto:puk@mlemrecords.com).
 
+Published builds contain CLAP, VST3 and Standalone versions.
+
 ## Includes
 
 - [mlem_meter](mlem_meter) 0.1.1 - An audio meter.
@@ -24,3 +26,9 @@ For windows:
 ```
 cargo xtask bundle mlem_meter --release --target x86_64-pc-windows-gnu
 ```
+
+## Dependencies
+
+Uses nih-plug under ISC.
+Uses Phosphor icons under MIT.
+Uses egui under MIT.
