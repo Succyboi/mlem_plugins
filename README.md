@@ -29,6 +29,6 @@ cargo xtask bundle mlem_meter --release --target x86_64-pc-windows-gnu
 
 ## Dependencies
 
-Uses nih-plug under ISC.
-Uses Phosphor icons under MIT.
-Uses egui under MIT.
+- Uses nih-plug under ISC.
+- Uses Phosphor icons under MIT.
+- Uses egui under MIT.
