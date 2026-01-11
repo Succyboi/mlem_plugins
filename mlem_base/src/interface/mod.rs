@@ -5,7 +5,7 @@ use std::{ hash::Hash, sync::{ Arc, RwLock, atomic::Ordering } };
 use mlem_egui_themes::Theme;
 use nih_plug::{ prelude::*, util::gain_to_db };
 use nih_plug_egui::{ EguiState, egui::{ self, Align, Context, Layout, Ui } };
-use crate::{ ConsoleReceiver, PluginImplementationParams, consts, interface::interface_utils::{help_label, parameter_grid, parameter_label} };
+use crate::{ console::ConsoleReceiver, interface::interface_utils::{help_label, parameter_grid, parameter_label}, metadata::PluginMetadata };
 
 const DEFAULT_SPACE: f32 = 4.0;
 const LABEL_WIDTH: f32 = 64.0;
@@ -20,8 +20,10 @@ pub enum InterfaceCenterView {
     Plugin
 }
 
-pub struct Interface {
+pub struct Interface<T: Params> {
     pub console: ConsoleReceiver,
+    metadata: PluginMetadata,
+    params: Arc<T>,
 
     center_view: InterfaceCenterView,
 
@@ -29,10 +31,12 @@ pub struct Interface {
     themes: [mlem_egui_themes::Theme; 4],
 }
 
-impl Interface {
-    pub fn new() -> Interface {
+impl<T: Params> Interface<T> {
+    pub fn new(metadata: PluginMetadata, params: Arc<T>) -> Interface<T> {
         return Self {
             console: ConsoleReceiver::new(),
+            metadata, 
+            params,
 
             center_view: InterfaceCenterView::Plugin,
 
@@ -46,40 +50,36 @@ impl Interface {
         };
     }
 
-    pub fn create_interface(self, editor_state: Arc<EguiState>, params: Arc<PluginImplementationParams>) -> Option<Box<dyn Editor>> {
+    pub fn create_interface(self, editor_state: Arc<EguiState>) -> Option<Box<dyn Editor>> {
         let interface_lock = Arc::from(RwLock::from(self));
         let interface_lock_build = interface_lock.clone();
         let interface_lock_update = interface_lock.clone();
-        let params_build = params.clone();
-        let params_update = params.clone();
 
         return nih_plug_egui::create_egui_editor(
             editor_state,
             (),
             move |egui_ctx, _state| {
-                let params_build = params_build.clone();
                 let interface = interface_lock_build.clone();
 
-                interface.write().unwrap().build_interface(egui_ctx, _state, params_build);
+                interface.write().unwrap().build_interface(egui_ctx, _state);
             },
             move |egui_ctx, _setter, _state| {
-                let params_update = params_update.clone();
                 let interface = interface_lock_update.clone();
 
-                interface.write().unwrap().draw_interface(egui_ctx, _setter, _state, params_update);
+                interface.write().unwrap().draw_interface(egui_ctx, _setter, _state);
             },
         );
     }
 
-    fn build_interface(&mut self, egui_ctx: &Context, _state: &mut (), _params: Arc<PluginImplementationParams>) {
+    fn build_interface(&mut self, egui_ctx: &Context, _state: &mut ()) {
         mlem_egui_themes::set_theme(egui_ctx, self.get_theme());
 
-        self.console.log(format!("{name} \"{description}\" v{version} {build_type} ({id}).", name = consts::NAME, description = consts::DESCRIPTION, version = consts::VERSION, build_type = consts::BUILD_TYPE, id = consts::BUILD_ID));
-        self.console.log(format!("By {}", consts::AUTHORS));
-        self.console.log(format!("{}", consts::MOTD));
+        self.console.log(format!("{name} \"{description}\" v{version} {build_type} ({id}).", name = self.metadata.name, description = self.metadata.description, version = self.metadata.version, build_type = self.metadata.build_type, id = self.metadata.build_id));
+        self.console.log(format!("By {}", self.metadata.authors));
+        self.console.log(format!("---"));
     }
     
-    fn draw_interface(&mut self, egui_ctx: &Context, _setter: &ParamSetter, _state: &mut (), _params: Arc<PluginImplementationParams>) {    
+    fn draw_interface(&mut self, egui_ctx: &Context, _setter: &ParamSetter, _state: &mut ()) {    
         egui::TopBottomPanel::top(TOP_ID).show(egui_ctx, |ui| {
             ui.horizontal(|ui| {
                 self.draw_about_button(ui);
@@ -93,7 +93,7 @@ impl Interface {
         });
 
         egui::CentralPanel::default().show(egui_ctx, |ui| {
-            self.draw_center(ui, _setter, _params);
+            self.draw_center(ui, _setter);
         });
     }
     
@@ -132,9 +132,9 @@ impl Interface {
 
     fn draw_about_button(&mut self, ui: &mut Ui) {
         let button_response = if self.center_view == InterfaceCenterView::About {
-            ui.button(format!("{icon} Hide", icon = consts::ICON))
+            ui.button(format!("{icon} Hide", icon = self.metadata.icon))
         } else {
-            ui.button(format!("{icon} {name}", name = consts::NAME, icon = consts::ICON))
+            ui.button(format!("{icon} {name}", name = self.metadata.name, icon = self.metadata.icon))
         };
 
         if button_response.clicked() {
@@ -147,62 +147,26 @@ impl Interface {
 
         ui.add_enabled_ui(false, |ui| {
             ui.with_layout(Layout::bottom_up(Align::LEFT), |ui| {
-                ui.small(consts::DESCRIPTION);
+                ui.small(self.metadata.description);
             });
         });
     }
 
-    fn draw_center(&mut self, ui: &mut Ui, setter: &ParamSetter, params: Arc<PluginImplementationParams>) {
+    fn draw_center(&mut self, ui: &mut Ui, setter: &ParamSetter) {
         match self.center_view {
             InterfaceCenterView::About => self.draw_about(ui),
-            InterfaceCenterView::Console => self.draw_console(ui, setter, params, CONSOLE_MAIN_ID),
-            InterfaceCenterView::Plugin => self.draw_plugin(ui, setter, params),
+            InterfaceCenterView::Console => self.draw_console(ui, setter, CONSOLE_MAIN_ID),
+            InterfaceCenterView::Plugin => self.draw_plugin(ui, setter),
         }
     }
 
-    fn draw_plugin(&mut self, ui: &mut Ui, setter: &ParamSetter, params: Arc<PluginImplementationParams>) {
-        parameter_grid(ui, "Meters", |ui| {
-            parameter_label(ui, "Integrated", "Loudness total since reset.", |ui| {
-                ui.monospace(format!("{: >6.2} lufs", params.lufs_global_loudness.load(Ordering::Relaxed)));
-            });
-
-            parameter_label(ui, "Momentary", "Loudness over a duration of 0.4 seconds.", |ui| {
-                ui.monospace(format!("{: >6.2} lufs", params.lufs_momentary_loudness.load(Ordering::Relaxed)));
-            });
-
-            parameter_label(ui, "Short Term", "Loudness over a duration of 3 seconds.", |ui| {
-                ui.monospace(format!("{: >6.2} lufs", params.lufs_shortterm_loudness.load(Ordering::Relaxed)));
-            });
-
-            parameter_label(ui, "Range", "Loudness range total since reset.", |ui| {
-                ui.monospace(format!("{: >6.2} lufs", params.lufs_range_loudness.load(Ordering::Relaxed)));
-            });
-        });
-        
-        ui.add_space(ui.available_height() - 12.0);
-        ui.horizontal(|ui| {
-            let seconds = params.active_time_ms.load(Ordering::Relaxed) / 1000.0;
-            let minutes = f32::floor(seconds / 60.0);
-            
-            if ui.button("Reset").clicked() {
-                params.reset_meter.store(true, Ordering::Relaxed);
-            }
-            ui.monospace(format!("{minutes: >1.0}m{seconds: >1.0}s", minutes = minutes, seconds = seconds - minutes * 60.0));
-            
-            ui.with_layout(Layout::right_to_left(Align::BOTTOM), |ui| {
-                let mut reset_on_play_value = params.reset_on_play.value();
-           
-                if ui.checkbox(&mut reset_on_play_value, "Reset On Play").clicked() {
-                    setter.begin_set_parameter(&params.reset_on_play);
-                    setter.set_parameter(&params.reset_on_play, reset_on_play_value);
-                    setter.end_set_parameter(&params.reset_on_play);
-                }
-            });
-        });
+    fn draw_plugin(&mut self, ui: &mut Ui, setter: &ParamSetter) {
+        // TODO plugin draw
     }
 
-    fn draw_console(&mut self, ui: &mut Ui, setter: &ParamSetter, params: Arc<PluginImplementationParams>, hash: impl Hash) {        
+    fn draw_console(&mut self, ui: &mut Ui, setter: &ParamSetter, hash: impl Hash) {        
         ui.vertical(|ui| {
+            /* TODO bring this back
             ui.horizontal(|ui| {
                 let load = (params.run_ms.load(Ordering::Relaxed) / (params.buffer_size.load(Ordering::Relaxed) as f32 / params.sample_rate.load(Ordering::Relaxed) * 1000.0) * 100.0).floor();
                 let status = format!("({ms:.2}ms / {load:>3}%) @ {rate}hz, {buff}buf, {channels}ch.", 
@@ -213,7 +177,7 @@ impl Interface {
                     channels = params.channels.load(Ordering::Relaxed));
         
                     ui.monospace(format!("{}", status));
-            });
+            });*/
 
             ui.with_layout(egui::Layout::top_down_justified(egui::Align::LEFT).with_cross_justify(true), |ui| {
                 let log_string = self.console.get_log_string();
@@ -230,7 +194,7 @@ impl Interface {
     fn draw_about(&mut self, ui: &mut Ui) {
         egui::ScrollArea::vertical().show(ui, |ui| {
             self.draw_name(ui);
-            ui.label(consts::DESCRIPTION);
+            ui.label(self.metadata.description);
             ui.separator();
             
             self.draw_info(ui);
@@ -238,25 +202,25 @@ impl Interface {
             ui.separator();
             ui.label("Credits");
 
-            ui.monospace(format!("By {authors}", authors = consts::AUTHORS));
+            ui.monospace(format!("By {authors}", authors = self.metadata.authors));
             ui.separator();
-            ui.monospace(format!("{}", consts::CREDITS));     
+            ui.monospace(format!("{}", self.metadata.credits));
 
             ui.separator();
             ui.label("License");
-            ui.monospace(format!("{}", consts::LICENSE_CONTENTS));        
+            ui.monospace(format!("{}", self.metadata.license_contents));        
         });
     }
 
     fn draw_name(&mut self, ui: &mut Ui) {
-        ui.heading(format!("{icon} {name}", icon = consts::ICON, name = consts::NAME));
+        ui.heading(format!("{icon} {name}", icon = self.metadata.icon, name = self.metadata.name));
     }
 
     fn draw_info(&mut self, ui: &mut Ui) {
-        ui.label(format!("v{version} {profile} ({id})", version = consts::VERSION, profile = consts::BUILD_TYPE, id = consts::BUILD_ID));
+        ui.label(format!("v{version} {profile} ({id})", version = self.metadata.version, profile = self.metadata.build_type, id = self.metadata.build_id));
         ui.horizontal(|ui| {
             ui.label("By");
-            ui.hyperlink_to(consts::PLUGIN_VENDOR, consts::HOMEPAGE);
+            ui.hyperlink_to(self.metadata.vendor, self.metadata.homepage_url);
         });
     }
 

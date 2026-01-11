@@ -1,15 +1,15 @@
 pub mod consts;
 pub mod runtime;
 pub mod interface;
-pub mod console;
 
 use atomic_float::{ AtomicF32, AtomicF64 };
-use console::ConsoleReceiver;
+use mlem_base::console::ConsoleReceiver;
 use runtime::{ Runtime };
 use interface::{ Interface };
 use nih_plug::prelude::*;
 use std::sync::{ Arc, RwLock, atomic::{AtomicBool, AtomicUsize} };
 use nih_plug_egui::EguiState;
+use consts::PLUGIN_METADATA;
 
 pub struct PluginImplementation {
     runtime: Runtime,
@@ -48,7 +48,7 @@ impl Default for PluginImplementation {
 impl Default for PluginImplementationParams {
     fn default() -> Self {
         Self {
-            editor_state: EguiState::from_size(consts::WINDOW_SIZE_WIDTH, consts::WINDOW_SIZE_HEIGHT),
+            editor_state: EguiState::from_size(PLUGIN_METADATA.window_width, PLUGIN_METADATA.window_height),
             reset_on_play: BoolParam::new("Reset On Play", true),
 
             reset_meter: AtomicBool::new(false),
@@ -69,11 +69,11 @@ impl Default for PluginImplementationParams {
 impl PluginImplementation { }
 
 impl Plugin for PluginImplementation {
-    const NAME: &'static str = consts::NAME;
-    const VENDOR: &'static str = consts::PLUGIN_VENDOR;
-    const URL: &'static str = consts::HOMEPAGE;
-    const EMAIL: &'static str = consts::PLUGIN_EMAIL;
-    const VERSION: &'static str = consts::VERSION;
+    const NAME: &'static str = PLUGIN_METADATA.name;
+    const VENDOR: &'static str = PLUGIN_METADATA.vendor;
+    const URL: &'static str = PLUGIN_METADATA.homepage_url;
+    const EMAIL: &'static str = PLUGIN_METADATA.email;
+    const VERSION: &'static str = PLUGIN_METADATA.version;
 
     const AUDIO_IO_LAYOUTS: &'static [AudioIOLayout] = &[AudioIOLayout {
         main_input_channels: NonZeroU32::new(2),
@@ -138,18 +138,18 @@ impl Plugin for PluginImplementation {
 }
 
 impl ClapPlugin for PluginImplementation {
-    const CLAP_ID: &'static str = consts::PLUGIN_ID;
-    const CLAP_DESCRIPTION: Option<&'static str> = Some(consts::DESCRIPTION);
-    const CLAP_MANUAL_URL: Option<&'static str> = Some(consts::HOMEPAGE);
-    const CLAP_SUPPORT_URL: Option<&'static str> = Some(consts::DESCRIPTION);
+    const CLAP_ID: &'static str = PLUGIN_METADATA.identifier;
+    const CLAP_DESCRIPTION: Option<&'static str> = Some(PLUGIN_METADATA.description);
+    const CLAP_MANUAL_URL: Option<&'static str> = Some(PLUGIN_METADATA.homepage_url);
+    const CLAP_SUPPORT_URL: Option<&'static str> = Some(PLUGIN_METADATA.support_url);
 
-    const CLAP_FEATURES: &'static [ClapFeature] = consts::PLUGIN_CLAP_FEATURES;
+    const CLAP_FEATURES: &'static [ClapFeature] = PLUGIN_METADATA.clap_features;
 }
 
 impl Vst3Plugin for PluginImplementation {
-    const VST3_CLASS_ID: [u8; 16] = consts::PLUGIN_CLASS_ID;
+    const VST3_CLASS_ID: [u8; 16] = PLUGIN_METADATA.class_identifier;
 
-    const VST3_SUBCATEGORIES: &'static [Vst3SubCategory] = consts::PLUGIN_VST3_SUBCATEGORIES;
+    const VST3_SUBCATEGORIES: &'static [Vst3SubCategory] = PLUGIN_METADATA.vst3_subcategories;
 }
 
 nih_export_clap!(PluginImplementation);

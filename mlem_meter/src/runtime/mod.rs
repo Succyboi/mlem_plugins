@@ -2,8 +2,9 @@ pub mod utils;
 
 use core::fmt;
 use std::{ fmt::Error, sync::atomic::Ordering };
-
-use crate::{ PluginImplementationParams, console::ConsoleSender};
+use mlem_base::console::ConsoleSender;
+use crate::consts::PLUGIN_METADATA;
+use crate::{ PluginImplementationParams };
 use nih_plug::{ prelude::* };
 use utils::{ RMS, Timer };
 use ebur128::{ EbuR128, Mode };
@@ -45,7 +46,7 @@ impl Runtime {
             
             run_time: RMS::new(1.0),
             ebur128: None,
-            clip: crate::consts::BUILD_IS_DEBUG
+            clip: PLUGIN_METADATA.build_is_debug
         };
 
         return runtime;

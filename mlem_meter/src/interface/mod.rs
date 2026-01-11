@@ -6,6 +6,7 @@ use mlem_egui_themes::Theme;
 use nih_plug::{ prelude::*, util::gain_to_db };
 use nih_plug_egui::{ EguiState, egui::{ self, Align, Context, Layout, Ui } };
 use crate::{ ConsoleReceiver, PluginImplementationParams, consts, interface::interface_utils::{help_label, parameter_grid, parameter_label} };
+use crate::consts::PLUGIN_METADATA;
 
 const DEFAULT_SPACE: f32 = 4.0;
 const LABEL_WIDTH: f32 = 64.0;
@@ -74,9 +75,9 @@ impl Interface {
     fn build_interface(&mut self, egui_ctx: &Context, _state: &mut (), _params: Arc<PluginImplementationParams>) {
         mlem_egui_themes::set_theme(egui_ctx, self.get_theme());
 
-        self.console.log(format!("{name} \"{description}\" v{version} {build_type} ({id}).", name = consts::NAME, description = consts::DESCRIPTION, version = consts::VERSION, build_type = consts::BUILD_TYPE, id = consts::BUILD_ID));
-        self.console.log(format!("By {}", consts::AUTHORS));
-        self.console.log(format!("{}", consts::MOTD));
+        self.console.log(format!("{name} \"{description}\" v{version} {build_type} ({id}).", name = PLUGIN_METADATA.name, description = PLUGIN_METADATA.description, version = PLUGIN_METADATA.version, build_type = PLUGIN_METADATA.build_type, id = PLUGIN_METADATA.build_id));
+        self.console.log(format!("By {}", PLUGIN_METADATA.authors));
+        self.console.log(format!("---"));
     }
     
     fn draw_interface(&mut self, egui_ctx: &Context, _setter: &ParamSetter, _state: &mut (), _params: Arc<PluginImplementationParams>) {    
@@ -132,9 +133,9 @@ impl Interface {
 
     fn draw_about_button(&mut self, ui: &mut Ui) {
         let button_response = if self.center_view == InterfaceCenterView::About {
-            ui.button(format!("{icon} Hide", icon = consts::ICON))
+            ui.button(format!("{icon} Hide", icon = PLUGIN_METADATA.icon))
         } else {
-            ui.button(format!("{icon} {name}", name = consts::NAME, icon = consts::ICON))
+            ui.button(format!("{icon} {name}", name = PLUGIN_METADATA.name, icon = PLUGIN_METADATA.icon))
         };
 
         if button_response.clicked() {
@@ -147,7 +148,7 @@ impl Interface {
 
         ui.add_enabled_ui(false, |ui| {
             ui.with_layout(Layout::bottom_up(Align::LEFT), |ui| {
-                ui.small(consts::DESCRIPTION);
+                ui.small(PLUGIN_METADATA.description);
             });
         });
     }
@@ -230,7 +231,7 @@ impl Interface {
     fn draw_about(&mut self, ui: &mut Ui) {
         egui::ScrollArea::vertical().show(ui, |ui| {
             self.draw_name(ui);
-            ui.label(consts::DESCRIPTION);
+            ui.label(PLUGIN_METADATA.description);
             ui.separator();
             
             self.draw_info(ui);
@@ -238,25 +239,25 @@ impl Interface {
             ui.separator();
             ui.label("Credits");
 
-            ui.monospace(format!("By {authors}", authors = consts::AUTHORS));
+            ui.monospace(format!("By {authors}", authors = PLUGIN_METADATA.authors));
             ui.separator();
-            ui.monospace(format!("{}", consts::CREDITS));     
+            ui.monospace(format!("{}", PLUGIN_METADATA.credits));
 
             ui.separator();
             ui.label("License");
-            ui.monospace(format!("{}", consts::LICENSE_CONTENTS));        
+            ui.monospace(format!("{}", PLUGIN_METADATA.license_contents));        
         });
     }
 
     fn draw_name(&mut self, ui: &mut Ui) {
-        ui.heading(format!("{icon} {name}", icon = consts::ICON, name = consts::NAME));
+        ui.heading(format!("{icon} {name}", icon = PLUGIN_METADATA.icon, name = PLUGIN_METADATA.name));
     }
 
     fn draw_info(&mut self, ui: &mut Ui) {
-        ui.label(format!("v{version} {profile} ({id})", version = consts::VERSION, profile = consts::BUILD_TYPE, id = consts::BUILD_ID));
+        ui.label(format!("v{version} {profile} ({id})", version = PLUGIN_METADATA.version, profile = PLUGIN_METADATA.build_type, id = PLUGIN_METADATA.build_id));
         ui.horizontal(|ui| {
             ui.label("By");
-            ui.hyperlink_to(consts::PLUGIN_VENDOR, consts::HOMEPAGE);
+            ui.hyperlink_to(PLUGIN_METADATA.vendor, PLUGIN_METADATA.homepage_url);
         });
     }
 
