@@ -19,3 +19,4 @@ nih_plug_egui = { git = "https://github.com/robbert-vdh/nih-plug" }
 ebur128 = "0.1.10"
 atomic_float = "1.1.0"
 mlem_egui_themes = { path = "../mlem_egui_themes" }
+mlem_base = { path = "../mlem_base" }
