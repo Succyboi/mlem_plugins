@@ -1,6 +1,7 @@
 pub mod console;
 pub mod interface;
 pub mod metadata;
+pub mod parameters;
 pub mod consts;
 
 use crate::{interface::Interface, metadata::PluginMetadata};
@@ -17,10 +18,6 @@ impl<T: PluginImplementation> Plugin<T> {
             metadata,
             implementation
         }
-    }
-
-    pub fn create_interface() {
-        
     }
 }
 

@@ -5,7 +5,7 @@ use std::{ hash::Hash, sync::{ Arc, RwLock, atomic::Ordering } };
 use mlem_egui_themes::Theme;
 use nih_plug::{ prelude::*, util::gain_to_db };
 use nih_plug_egui::{ EguiState, egui::{ self, Align, Context, Layout, Ui } };
-use crate::{ console::ConsoleReceiver, interface::interface_utils::{help_label, parameter_grid, parameter_label}, metadata::PluginMetadata };
+use crate::{ console::ConsoleReceiver, interface::interface_utils::{help_label, parameter_grid, parameter_label}, metadata::PluginMetadata, parameters::Parameters };
 
 const DEFAULT_SPACE: f32 = 4.0;
 const LABEL_WIDTH: f32 = 64.0;
@@ -20,7 +20,7 @@ pub enum InterfaceCenterView {
     Plugin
 }
 
-pub struct Interface<T: Params> {
+pub struct Interface<T: Params + Parameters> {
     pub console: ConsoleReceiver,
     metadata: PluginMetadata,
     params: Arc<T>,
@@ -31,8 +31,8 @@ pub struct Interface<T: Params> {
     themes: [mlem_egui_themes::Theme; 4],
 }
 
-impl<T: Params> Interface<T> {
-    pub fn new(metadata: PluginMetadata, params: Arc<T>) -> Interface<T> {
+impl<T: Params + Parameters> Interface<T> {
+    pub fn new(metadata: PluginMetadata, params: Arc<T>, draw: impl FnOnce(Ui, Arc<T>)) -> Interface<T> {
         return Self {
             console: ConsoleReceiver::new(),
             metadata, 
@@ -166,18 +166,17 @@ impl<T: Params> Interface<T> {
 
     fn draw_console(&mut self, ui: &mut Ui, setter: &ParamSetter, hash: impl Hash) {        
         ui.vertical(|ui| {
-            /* TODO bring this back
             ui.horizontal(|ui| {
-                let load = (params.run_ms.load(Ordering::Relaxed) / (params.buffer_size.load(Ordering::Relaxed) as f32 / params.sample_rate.load(Ordering::Relaxed) * 1000.0) * 100.0).floor();
+                let load = (self.params.run_ms().load(Ordering::Relaxed) / (self.params.buffer_size().load(Ordering::Relaxed) as f32 / self.params.sample_rate().load(Ordering::Relaxed) * 1000.0) * 100.0).floor();
                 let status = format!("({ms:.2}ms / {load:>3}%) @ {rate}hz, {buff}buf, {channels}ch.", 
-                    ms = params.run_ms.load(Ordering::Relaxed),
+                    ms = self.params.run_ms().load(Ordering::Relaxed),
                     load = load, 
-                    rate = params.sample_rate.load(Ordering::Relaxed),
-                    buff = params.buffer_size.load(Ordering::Relaxed),
-                    channels = params.channels.load(Ordering::Relaxed));
+                    rate = self.params.sample_rate().load(Ordering::Relaxed),
+                    buff = self.params.buffer_size().load(Ordering::Relaxed),
+                    channels = self.params.channels().load(Ordering::Relaxed));
         
                     ui.monospace(format!("{}", status));
-            });*/
+            });
 
             ui.with_layout(egui::Layout::top_down_justified(egui::Align::LEFT).with_cross_justify(true), |ui| {
                 let log_string = self.console.get_log_string();

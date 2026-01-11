@@ -1,11 +1,10 @@
 pub mod consts;
 pub mod runtime;
-pub mod interface;
 
 use atomic_float::{ AtomicF32, AtomicF64 };
-use mlem_base::console::ConsoleReceiver;
+use mlem_base::parameters::Parameters;
 use runtime::{ Runtime };
-use interface::{ Interface };
+use mlem_base::interface::{ Interface };
 use nih_plug::prelude::*;
 use std::sync::{ Arc, RwLock, atomic::{AtomicBool, AtomicUsize} };
 use nih_plug_egui::EguiState;
@@ -21,12 +20,12 @@ pub struct PluginImplementationParams {
     #[persist = "editor-state"] editor_state: Arc<EguiState>,
     #[id = "reset_on_play"]     reset_on_play: BoolParam,
     
-    reset_meter: AtomicBool,
     sample_rate: AtomicF32,
     buffer_size: AtomicUsize,
     channels: AtomicUsize,
     run_ms: AtomicF32,
-
+    
+    reset_meter: AtomicBool,
     active_time_ms: AtomicF32,
     lufs_global_loudness: AtomicF64,
     lufs_momentary_loudness: AtomicF64,
@@ -66,6 +65,13 @@ impl Default for PluginImplementationParams {
     }
 }
 
+impl Parameters for PluginImplementationParams {
+    fn sample_rate(&self) -> &AtomicF32 { &self.sample_rate }
+    fn buffer_size(&self) -> &AtomicUsize { &self.buffer_size }
+    fn channels(&self) -> &AtomicUsize { &self.channels }
+    fn run_ms(&self) -> &AtomicF32 { &self.run_ms }
+}
+
 impl PluginImplementation { }
 
 impl Plugin for PluginImplementation {
@@ -100,10 +106,10 @@ impl Plugin for PluginImplementation {
     fn editor(&mut self, _async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
         let editor_state = self.params.editor_state.clone();
         let params = self.params.clone();
-        let interface = Interface::new();
+        let interface = Interface::new(consts::PLUGIN_METADATA, params);
         
         self.runtime.console = Some(interface.console.create_sender());
-        let editor = interface.create_interface(editor_state, params);
+        let editor = interface.create_interface(editor_state);
 
         return editor;
     }
