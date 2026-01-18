@@ -4,8 +4,10 @@ pub mod metadata;
 pub mod parameters;
 pub mod consts;
 
-use crate::{interface::Interface, metadata::PluginMetadata};
+use crate::{interface::Interface, metadata::PluginMetadata, parameters::PluginParameters};
+use std::sync::Arc;
 use nih_plug_egui::{ egui::{ Ui } };
+use nih_plug::context::gui::ParamSetter;
 
 pub struct Plugin<T: PluginImplementation> {
     metadata: PluginMetadata,
@@ -23,5 +25,6 @@ impl<T: PluginImplementation> Plugin<T> {
 
 pub trait PluginImplementation {
     fn metadata() -> PluginMetadata;
-    fn interface(&self, ui: &mut Ui) -> impl FnOnce();
+    fn params(&self) ->  Arc<dyn PluginParameters>;
+    fn interface_center(&self) -> impl FnOnce(&mut Ui, &ParamSetter);
 }

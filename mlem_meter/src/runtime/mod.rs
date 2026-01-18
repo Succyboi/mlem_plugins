@@ -4,7 +4,7 @@ use core::fmt;
 use std::{ fmt::Error, sync::atomic::Ordering };
 use mlem_base::console::ConsoleSender;
 use crate::consts::PLUGIN_METADATA;
-use crate::{ PluginImplementationParams };
+use crate::{ MeterParams };
 use nih_plug::{ prelude::* };
 use utils::{ RMS, Timer };
 use ebur128::{ EbuR128, Mode };
@@ -72,7 +72,7 @@ impl Runtime {
         self.log(format!("Reset in {:.2}ms.", execute_timer.elapsed_ms()));
     }
 
-    pub fn run(&mut self, buffer: &mut Buffer, params: &PluginImplementationParams, transport: &Transport) {
+    pub fn run(&mut self, buffer: &mut Buffer, params: &MeterParams, transport: &Transport) {
         self.buffer_size = buffer.samples();
         self.channels = buffer.channels();
         let execute_timer = Timer::new();
@@ -146,7 +146,7 @@ impl Runtime {
         Ok(())
     }
 
-    pub fn update_params(&mut self, params: &PluginImplementationParams) {
+    pub fn update_params(&mut self, params: &MeterParams) {
         params.sample_rate.store(self.sample_rate, Ordering::Relaxed);
         params.buffer_size.store(self.buffer_size, Ordering::Relaxed);
         params.channels.store(self.channels, Ordering::Relaxed);

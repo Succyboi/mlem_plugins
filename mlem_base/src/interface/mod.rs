@@ -3,9 +3,9 @@ pub mod param_toggle;
 
 use std::{ hash::Hash, sync::{ Arc, RwLock, atomic::Ordering } };
 use mlem_egui_themes::Theme;
-use nih_plug::{ prelude::*, util::gain_to_db };
+use nih_plug::{ plugin, prelude::*, util::gain_to_db };
 use nih_plug_egui::{ EguiState, egui::{ self, Align, Context, Layout, Ui } };
-use crate::{ console::ConsoleReceiver, interface::interface_utils::{help_label, parameter_grid, parameter_label}, metadata::PluginMetadata, parameters::Parameters };
+use crate::{ PluginImplementation, console::ConsoleReceiver, interface::interface_utils::{help_label, parameter_grid, parameter_label}, metadata::PluginMetadata, parameters::PluginParameters };
 
 const DEFAULT_SPACE: f32 = 4.0;
 const LABEL_WIDTH: f32 = 64.0;
@@ -14,31 +14,35 @@ const CONSOLE_MAIN_ID: &str = "Central/Console/Main";
 const CONSOLE_ICON: &str = "\u{E47E}";
 
 #[derive(PartialEq)]
-pub enum InterfaceCenterView {
+pub enum InterfaceCenterViewState {
     About,
     Console,
     Plugin
 }
 
-pub struct Interface<T: Params + Parameters> {
+pub struct Interface<T: Params + PluginParameters, U: FnOnce(&mut Ui, &ParamSetter)> {
     pub console: ConsoleReceiver,
     metadata: PluginMetadata,
     params: Arc<T>,
 
-    center_view: InterfaceCenterView,
+    center_draw: U,
+
+    center_view: InterfaceCenterViewState,
 
     theme: usize,
     themes: [mlem_egui_themes::Theme; 4],
 }
 
-impl<T: Params + Parameters> Interface<T> {
-    pub fn new(metadata: PluginMetadata, params: Arc<T>, draw: impl FnOnce(Ui, Arc<T>)) -> Interface<T> {
+impl<T: Params + PluginParameters, U: FnOnce(&mut Ui, &ParamSetter)> Interface<T, U> {
+    pub fn new(metadata: PluginMetadata, params: Arc<T>, center_draw: U) -> Interface<T, U> {
         return Self {
             console: ConsoleReceiver::new(),
             metadata, 
-            params,
+            params: params,
 
-            center_view: InterfaceCenterView::Plugin,
+            center_draw,
+
+            center_view: InterfaceCenterViewState::Plugin,
 
             theme: 0,
             themes: [
@@ -58,15 +62,15 @@ impl<T: Params + Parameters> Interface<T> {
         return nih_plug_egui::create_egui_editor(
             editor_state,
             (),
-            move |egui_ctx, _state| {
+            move |egui_ctx, state| {
                 let interface = interface_lock_build.clone();
 
-                interface.write().unwrap().build_interface(egui_ctx, _state);
+                interface.write().unwrap().build_interface(egui_ctx, state);
             },
-            move |egui_ctx, _setter, _state| {
+            move |egui_ctx, setter, state| {
                 let interface = interface_lock_update.clone();
 
-                interface.write().unwrap().draw_interface(egui_ctx, _setter, _state);
+                interface.write().unwrap().draw_interface(egui_ctx, setter, state);
             },
         );
     }
@@ -79,7 +83,7 @@ impl<T: Params + Parameters> Interface<T> {
         self.console.log(format!("---"));
     }
     
-    fn draw_interface(&mut self, egui_ctx: &Context, _setter: &ParamSetter, _state: &mut ()) {    
+    fn draw_interface(&mut self, egui_ctx: &Context, setter: &ParamSetter, _state: &mut ()) {    
         egui::TopBottomPanel::top(TOP_ID).show(egui_ctx, |ui| {
             ui.horizontal(|ui| {
                 self.draw_about_button(ui);
@@ -93,7 +97,7 @@ impl<T: Params + Parameters> Interface<T> {
         });
 
         egui::CentralPanel::default().show(egui_ctx, |ui| {
-            self.draw_center(ui, _setter);
+            self.draw_center(ui, setter);
         });
     }
     
@@ -110,17 +114,17 @@ impl<T: Params + Parameters> Interface<T> {
         let console_updated = self.console.update();
 
         ui.horizontal(|ui| {
-            let button_response = if self.center_view == InterfaceCenterView::Console {
+            let button_response = if self.center_view == InterfaceCenterViewState::Console {
                 ui.button(format!("{icon} Hide", icon = CONSOLE_ICON))
             } else {
                 ui.button(CONSOLE_ICON)
             };
             
             if button_response.clicked() {
-                self.center_view = if self.center_view == InterfaceCenterView::Console {
-                    InterfaceCenterView::Plugin
+                self.center_view = if self.center_view == InterfaceCenterViewState::Console {
+                    InterfaceCenterViewState::Plugin
                 } else {
-                    InterfaceCenterView::Console
+                    InterfaceCenterViewState::Console
                 };
             }
 
@@ -131,17 +135,17 @@ impl<T: Params + Parameters> Interface<T> {
     }
 
     fn draw_about_button(&mut self, ui: &mut Ui) {
-        let button_response = if self.center_view == InterfaceCenterView::About {
+        let button_response = if self.center_view == InterfaceCenterViewState::About {
             ui.button(format!("{icon} Hide", icon = self.metadata.icon))
         } else {
             ui.button(format!("{icon} {name}", name = self.metadata.name, icon = self.metadata.icon))
         };
 
         if button_response.clicked() {
-            self.center_view = if self.center_view == InterfaceCenterView::About {
-                InterfaceCenterView::Plugin
+            self.center_view = if self.center_view == InterfaceCenterViewState::About {
+                InterfaceCenterViewState::Plugin
             } else {
-                InterfaceCenterView::About
+                InterfaceCenterViewState::About
             };
         }
 
@@ -154,9 +158,9 @@ impl<T: Params + Parameters> Interface<T> {
 
     fn draw_center(&mut self, ui: &mut Ui, setter: &ParamSetter) {
         match self.center_view {
-            InterfaceCenterView::About => self.draw_about(ui),
-            InterfaceCenterView::Console => self.draw_console(ui, setter, CONSOLE_MAIN_ID),
-            InterfaceCenterView::Plugin => self.draw_plugin(ui, setter),
+            InterfaceCenterViewState::About => self.draw_about(ui),
+            InterfaceCenterViewState::Console => self.draw_console(ui, setter, CONSOLE_MAIN_ID),
+            InterfaceCenterViewState::Plugin => self.draw_plugin(ui, setter),
         }
     }
 

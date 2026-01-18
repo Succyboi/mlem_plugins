@@ -2,21 +2,21 @@ pub mod consts;
 pub mod runtime;
 
 use atomic_float::{ AtomicF32, AtomicF64 };
-use mlem_base::parameters::Parameters;
+use mlem_base::{interface::interface_utils::{parameter_grid, parameter_label}, metadata::PluginMetadata, parameters::PluginParameters};
 use runtime::{ Runtime };
-use mlem_base::interface::{ Interface };
+use mlem_base::{ interface::{ Interface }, PluginImplementation };
 use nih_plug::prelude::*;
-use std::sync::{ Arc, RwLock, atomic::{AtomicBool, AtomicUsize} };
-use nih_plug_egui::EguiState;
+use std::sync::{ Arc, atomic::{AtomicBool, AtomicUsize, Ordering} };
+use nih_plug_egui::{EguiState, egui::{Align, Layout, Ui}};
 use consts::PLUGIN_METADATA;
 
-pub struct PluginImplementation {
+pub struct Meter {
     runtime: Runtime,
-    params: Arc<PluginImplementationParams>
+    params: Arc<MeterParams>
 }
 
 #[derive(Params)]
-pub struct PluginImplementationParams {
+pub struct MeterParams {
     #[persist = "editor-state"] editor_state: Arc<EguiState>,
     #[id = "reset_on_play"]     reset_on_play: BoolParam,
     
@@ -33,18 +33,18 @@ pub struct PluginImplementationParams {
     lufs_shortterm_loudness: AtomicF64
 }
 
-impl Default for PluginImplementation {
+impl Default for Meter {
     fn default() -> Self {
         let runtime = Runtime::new(None);
 
         Self {
             runtime: runtime,
-            params: Arc::new(PluginImplementationParams::default())
+            params: Arc::new(MeterParams::default())
         }
     }
 }
 
-impl Default for PluginImplementationParams {
+impl Default for MeterParams {
     fn default() -> Self {
         Self {
             editor_state: EguiState::from_size(PLUGIN_METADATA.window_width, PLUGIN_METADATA.window_height),
@@ -65,16 +65,69 @@ impl Default for PluginImplementationParams {
     }
 }
 
-impl Parameters for PluginImplementationParams {
+impl PluginParameters for MeterParams {
     fn sample_rate(&self) -> &AtomicF32 { &self.sample_rate }
     fn buffer_size(&self) -> &AtomicUsize { &self.buffer_size }
     fn channels(&self) -> &AtomicUsize { &self.channels }
     fn run_ms(&self) -> &AtomicF32 { &self.run_ms }
 }
 
-impl PluginImplementation { }
+impl Meter { }
 
-impl Plugin for PluginImplementation {
+impl PluginImplementation for Meter {
+    fn metadata() -> PluginMetadata {
+        return PLUGIN_METADATA;
+    }
+
+    fn params(&self) -> Arc<dyn PluginParameters> {
+        return self.params.clone();
+    }
+
+    fn interface_center(&self) -> impl FnOnce(&mut Ui, &ParamSetter) {
+        return |ui, setter| {
+            parameter_grid(ui, "Meters", |ui| {
+                parameter_label(ui, "Integrated", "Loudness total since reset.", |ui| {
+                    ui.monospace(format!("{: >6.2} lufs", self.params.lufs_global_loudness.load(Ordering::Relaxed)));
+                });
+
+                parameter_label(ui, "Momentary", "Loudness over a duration of 0.4 seconds.", |ui| {
+                    ui.monospace(format!("{: >6.2} lufs", self.params.lufs_momentary_loudness.load(Ordering::Relaxed)));
+                });
+
+                parameter_label(ui, "Short Term", "Loudness over a duration of 3 seconds.", |ui| {
+                    ui.monospace(format!("{: >6.2} lufs", self.params.lufs_shortterm_loudness.load(Ordering::Relaxed)));
+                });
+
+                parameter_label(ui, "Range", "Loudness range total since reset.", |ui| {
+                    ui.monospace(format!("{: >6.2} lufs", self.params.lufs_range_loudness.load(Ordering::Relaxed)));
+                });
+            });
+            
+            ui.add_space(ui.available_height() - 12.0);
+            ui.horizontal(|ui| {
+                let seconds = self.params.active_time_ms.load(Ordering::Relaxed) / 1000.0;
+                let minutes = f32::floor(seconds / 60.0);
+                
+                if ui.button("Reset").clicked() {
+                    self.params.reset_meter.store(true, Ordering::Relaxed);
+                }
+                ui.monospace(format!("{minutes: >1.0}m{seconds: >1.0}s", minutes = minutes, seconds = seconds - minutes * 60.0));
+                
+                ui.with_layout(Layout::right_to_left(Align::BOTTOM), |ui| {
+                    let mut reset_on_play_value = self.params.reset_on_play.value();
+            
+                    if ui.checkbox(&mut reset_on_play_value, "Reset On Play").clicked() {
+                        setter.begin_set_parameter(&self.params.reset_on_play);
+                        setter.set_parameter(&self.params.reset_on_play, reset_on_play_value);
+                        setter.end_set_parameter(&self.params.reset_on_play);
+                    }
+                });
+            });
+        };
+    }
+}
+
+impl Plugin for Meter {
     const NAME: &'static str = PLUGIN_METADATA.name;
     const VENDOR: &'static str = PLUGIN_METADATA.vendor;
     const URL: &'static str = PLUGIN_METADATA.homepage_url;
@@ -143,7 +196,7 @@ impl Plugin for PluginImplementation {
     }
 }
 
-impl ClapPlugin for PluginImplementation {
+impl ClapPlugin for Meter {
     const CLAP_ID: &'static str = PLUGIN_METADATA.identifier;
     const CLAP_DESCRIPTION: Option<&'static str> = Some(PLUGIN_METADATA.description);
     const CLAP_MANUAL_URL: Option<&'static str> = Some(PLUGIN_METADATA.homepage_url);
@@ -152,11 +205,11 @@ impl ClapPlugin for PluginImplementation {
     const CLAP_FEATURES: &'static [ClapFeature] = PLUGIN_METADATA.clap_features;
 }
 
-impl Vst3Plugin for PluginImplementation {
+impl Vst3Plugin for Meter {
     const VST3_CLASS_ID: [u8; 16] = PLUGIN_METADATA.class_identifier;
 
     const VST3_SUBCATEGORIES: &'static [Vst3SubCategory] = PLUGIN_METADATA.vst3_subcategories;
 }
 
-nih_export_clap!(PluginImplementation);
-nih_export_vst3!(PluginImplementation);
+nih_export_clap!(Meter);
+nih_export_vst3!(Meter);
