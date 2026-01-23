@@ -13,6 +13,8 @@ Published builds contain CLAP, VST3 and Standalone versions.
     > 
     > ![mlem_meter](mlem_meter/preview.png)
 - [lua_garden_plug](lua_garden_plug) - Total WIP.
+- mlem_dynrange - TBM - A manual linear dynamic range remapper. 
+- mlem_data - TBM - A file to audio converter.
 
 ## Building
 
