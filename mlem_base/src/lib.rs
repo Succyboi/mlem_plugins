@@ -26,5 +26,5 @@ impl<T: PluginImplementation> Plugin<T> {
 pub trait PluginImplementation {
     fn metadata() -> PluginMetadata;
     fn params(&self) ->  Arc<dyn PluginParameters>;
-    fn interface_center(&self) -> impl FnOnce(&mut Ui, &ParamSetter);
+    fn interface_center(&self) -> impl Fn(&mut Ui, &ParamSetter) + '_ + Send + Sync;
 }

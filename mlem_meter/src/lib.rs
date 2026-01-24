@@ -83,7 +83,7 @@ impl PluginImplementation for Meter {
         return self.params.clone();
     }
 
-    fn interface_center(&self) -> impl FnOnce(&mut Ui, &ParamSetter) {
+    fn interface_center(&self) -> impl Fn(&mut Ui, &ParamSetter) + 'static + Send + Sync {
         return |ui, setter| {
             parameter_grid(ui, "Meters", |ui| {
                 parameter_label(ui, "Integrated", "Loudness total since reset.", |ui| {
@@ -159,7 +159,8 @@ impl Plugin for Meter {
     fn editor(&mut self, _async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
         let editor_state = self.params.editor_state.clone();
         let params = self.params.clone();
-        let interface = Interface::new(consts::PLUGIN_METADATA, params);
+        let center_draw =  self.interface_center().clone();
+        let interface = Interface::new(consts::PLUGIN_METADATA, params, center_draw);
         
         self.runtime.console = Some(interface.console.create_sender());
         let editor = interface.create_interface(editor_state);
