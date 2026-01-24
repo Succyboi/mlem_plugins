@@ -1,3 +1,2 @@
 Built on mlem_base.
 Uses the ebur128 crate for lufs metering.
-For a full list of dependencies please check source.
