@@ -162,7 +162,7 @@ impl Plugin for Meter {
         let editor_state = self.params.editor_state.clone();
         let params = self.params.clone();
         let center_draw =  self.interface_center();
-        let interface = Interface::new(consts::PLUGIN_METADATA, params, center_draw);
+        let interface = Interface::new(consts::PLUGIN_METADATA, params);
         
         self.runtime.console = Some(interface.console.create_sender());
         let editor = interface.create_interface(editor_state);
