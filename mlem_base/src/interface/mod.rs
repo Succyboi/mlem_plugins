@@ -5,7 +5,7 @@ use std::{ hash::Hash, sync::{ Arc, RwLock, atomic::Ordering } };
 use mlem_egui_themes::Theme;
 use nih_plug::{ plugin, prelude::*, util::gain_to_db };
 use nih_plug_egui::{ EguiState, egui::{ self, Align, Context, Layout, Ui } };
-use crate::{ PluginImplementation, console::ConsoleReceiver, interface::interface_utils::{help_label, parameter_grid, parameter_label}, metadata::PluginMetadata, parameters::PluginParameters };
+use crate::{ PluginImplementation, console::ConsoleReceiver, consts, interface::interface_utils::{help_label, parameter_grid, parameter_label}, metadata::PluginMetadata, parameters::PluginParameters };
 
 const DEFAULT_SPACE: f32 = 4.0;
 const LABEL_WIDTH: f32 = 64.0;
@@ -20,10 +20,11 @@ pub enum InterfaceCenterViewState {
     Plugin
 }
 
-pub struct Interface<T: PluginParameters> {
+pub struct Interface<T: PluginImplementation<U>, U: PluginParameters> {
     pub console: ConsoleReceiver,
     metadata: PluginMetadata,
-    params: Arc<T>,
+    implementation: Arc<T>,
+    params: Arc<U>,
 
     center_view: InterfaceCenterViewState,
 
@@ -31,11 +32,14 @@ pub struct Interface<T: PluginParameters> {
     themes: [mlem_egui_themes::Theme; 4],
 }
 
-impl<T: Params + PluginParameters> Interface<T> {
-    pub fn new(metadata: PluginMetadata, params: Arc<T>) -> Interface<T> {
+impl<T: PluginImplementation<U>, U: PluginParameters> Interface<T, U> {
+    pub fn new(metadata: PluginMetadata, implementation: Arc<T>) -> Interface<T, U> {
+        let params = implementation.params().clone();
+
         return Self {
             console: ConsoleReceiver::new(),
             metadata, 
+            implementation,
             params: params,
 
             center_view: InterfaceCenterViewState::Plugin,
@@ -74,9 +78,15 @@ impl<T: Params + PluginParameters> Interface<T> {
     fn build_interface(&mut self, egui_ctx: &Context, _state: &mut ()) {
         mlem_egui_themes::set_theme(egui_ctx, self.get_theme());
 
+        self.console.log(format!("Initializing {name} v{version}.", name = consts::NAME, version = consts::VERSION));
+        self.console.log(format!(""));
+        self.console.log(format!("---"));
         self.console.log(format!("{name} \"{description}\" v{version} {build_type} ({id}).", name = self.metadata.name, description = self.metadata.description, version = self.metadata.version, build_type = self.metadata.build_type, id = self.metadata.build_id));
         self.console.log(format!("By {}", self.metadata.authors));
         self.console.log(format!("---"));
+        self.console.log(format!(""));
+
+        self.implementation.interface_build();
     }
     
     fn draw_interface(&mut self, egui_ctx: &Context, setter: &ParamSetter, _state: &mut ()) {    
@@ -84,6 +94,8 @@ impl<T: Params + PluginParameters> Interface<T> {
             ui.horizontal(|ui| {
                 self.draw_about_button(ui);
                 //self.draw_darkmode_toggle(egui_ctx, ui); Not now, implement saving this n stuff
+
+                self.draw_plugin_bar(ui, setter);
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Max), |ui| {
                     self.draw_console_toggle(ui);
@@ -134,7 +146,7 @@ impl<T: Params + PluginParameters> Interface<T> {
         let button_response = if self.center_view == InterfaceCenterViewState::About {
             ui.button(format!("{icon} Hide", icon = self.metadata.icon))
         } else {
-            ui.button(format!("{icon} {name}", name = self.metadata.name, icon = self.metadata.icon))
+            ui.button(format!("{icon}", icon = self.metadata.icon))
         };
 
         if button_response.clicked() {
@@ -144,36 +156,36 @@ impl<T: Params + PluginParameters> Interface<T> {
                 InterfaceCenterViewState::About
             };
         }
-
-        ui.add_enabled_ui(false, |ui| {
-            ui.with_layout(Layout::bottom_up(Align::LEFT), |ui| {
-                ui.small(self.metadata.description);
-            });
-        });
     }
 
     fn draw_center(&mut self, ui: &mut Ui, setter: &ParamSetter) {
         match self.center_view {
             InterfaceCenterViewState::About => self.draw_about(ui),
             InterfaceCenterViewState::Console => self.draw_console(ui, setter, CONSOLE_MAIN_ID),
-            InterfaceCenterViewState::Plugin => self.draw_plugin(ui, setter),
+            InterfaceCenterViewState::Plugin => self.draw_plugin_center(ui, setter),
         }
     }
 
-    fn draw_plugin(&mut self, ui: &mut Ui, setter: &ParamSetter) {
-        // TODO draw plugin
+    fn draw_plugin_center(&mut self, ui: &mut Ui, setter: &ParamSetter) {
+        self.implementation.interface_update_center(ui, setter);
     }
 
-    fn draw_console(&mut self, ui: &mut Ui, setter: &ParamSetter, hash: impl Hash) {        
+    fn draw_plugin_bar(&mut self, ui: &mut Ui, setter: &ParamSetter) {
+        self.implementation.interface_update_bar(ui, setter);
+    }
+
+    fn draw_console(&mut self, ui: &mut Ui, setter: &ParamSetter, hash: impl Hash) {     
+        let params = self.implementation.params();
+
         ui.vertical(|ui| {
             ui.horizontal(|ui| {
-                let load = (self.params.run_ms().load(Ordering::Relaxed) / (self.params.buffer_size().load(Ordering::Relaxed) as f32 / self.params.sample_rate().load(Ordering::Relaxed) * 1000.0) * 100.0).floor();
+                let load = (params.run_ms().load(Ordering::Relaxed) / (params.buffer_size().load(Ordering::Relaxed) as f32 / params.sample_rate().load(Ordering::Relaxed) * 1000.0) * 100.0).floor();
                 let status = format!("({ms:.2}ms / {load:>3}%) @ {rate}hz, {buff}buf, {channels}ch.", 
-                    ms = self.params.run_ms().load(Ordering::Relaxed),
+                    ms = params.run_ms().load(Ordering::Relaxed),
                     load = load, 
-                    rate = self.params.sample_rate().load(Ordering::Relaxed),
-                    buff = self.params.buffer_size().load(Ordering::Relaxed),
-                    channels = self.params.channels().load(Ordering::Relaxed));
+                    rate = params.sample_rate().load(Ordering::Relaxed),
+                    buff = params.buffer_size().load(Ordering::Relaxed),
+                    channels = params.channels().load(Ordering::Relaxed));
         
                     ui.monospace(format!("{}", status));
             });

@@ -11,7 +11,7 @@ pub const PLUGIN_METADATA: PluginMetadata = PluginMetadata::new(
     env!("CARGO_PKG_DESCRIPTION"),
     "ANTI-CAPITALIST SOFTWARE LICENSE v 1.4",
     include_str!("../LICENSE"),
-    include_str!("../credits.txt"),
+    concat!(include_str!("../credits.txt"), "\n\n", include_str!("../../mlem_base/credits.txt")),
     "Mlem Records",
     "support@mlemrecords.com", 
     "com.mlemrecords.mlem_meter", 
@@ -20,6 +20,6 @@ pub const PLUGIN_METADATA: PluginMetadata = PluginMetadata::new(
     &[ClapFeature::AudioEffect, ClapFeature::Stereo], 
     &[Vst3SubCategory::Fx, Vst3SubCategory::Tools], 
 
-    256, 
+    256,
     146
 );

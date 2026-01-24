@@ -9,27 +9,16 @@ use std::sync::Arc;
 use nih_plug_egui::{ egui::{ Ui } };
 use nih_plug::{context::gui::ParamSetter, params::Params};
 
-pub struct Plugin<T: PluginImplementation> {
-    metadata: PluginMetadata,
-    implementation: T
-}
-
-impl<T: PluginImplementation> Plugin<T> {
-    pub fn new(metadata: PluginMetadata, implementation: T) -> Self {
-        Self {
-            metadata,
-            implementation
-        }
-    }
-}
-
 // NOTE FOR FUTURE SELF
 // Ideally the only implementation done ever would be in the implementation of this base class.
 // This means depencency injection for a number of functions. 
 // E.g. interface_center, interface_bar, runtime_process, runtime_init, etc.
-// E.g. fn interface_center(&self) -> impl Fn(&mut Ui, &ParamSetter) + '_ + Send + Sync;
-pub trait PluginImplementation: 'static + Send + Sync  {
+pub trait PluginImplementation<T: PluginParameters>: 'static + Send + Sync  {
+    fn new(params: Arc<T>) -> Self;
     fn metadata(&self) -> PluginMetadata;
-    fn params(&self) ->  Arc<dyn PluginParameters>;
-    fn interface_center(&self, ui: &mut Ui, setter: &ParamSetter);
+    fn params(&self) ->  Arc<T>;
+    
+    fn interface_build(&self);
+    fn interface_update_center(&self, ui: &mut Ui, setter: &ParamSetter);
+    fn interface_update_bar(&self, ui: &mut Ui, setter: &ParamSetter);
 }

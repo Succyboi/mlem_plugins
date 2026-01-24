@@ -8,6 +8,4 @@ pub trait PluginParameters: Params {
     fn buffer_size(&self) -> &AtomicUsize;
     fn channels(&self) -> &AtomicUsize;
     fn run_ms(&self) -> &AtomicF32;
-
-    fn draw(&self);
 }
