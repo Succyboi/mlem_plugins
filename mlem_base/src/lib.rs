@@ -23,8 +23,12 @@ impl<T: PluginImplementation> Plugin<T> {
     }
 }
 
+// NOTE FOR FUTURE SELF
+// Ideally the only implementation done ever would be in the implementation of this base class.
+// This means depencency injection for a number of functions. 
+// E.g. interface_center, interface_bar, runtime_process, runtime_init, etc.
+// E.g. fn interface_center(&self) -> impl Fn(&dyn PluginImplementation, &mut Ui, &ParamSetter) + 'static + Send + Sync;
 pub trait PluginImplementation {
-    fn metadata() -> PluginMetadata;
+    fn metadata(&self) -> PluginMetadata;
     fn params(&self) ->  Arc<dyn PluginParameters>;
-    fn interface_center(&self) -> impl Fn(&mut Ui, &ParamSetter) + '_ + Send + Sync;
 }

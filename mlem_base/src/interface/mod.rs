@@ -20,10 +20,11 @@ pub enum InterfaceCenterViewState {
     Plugin
 }
 
-pub struct Interface<T: Params + PluginParameters, U: Fn(&mut Ui, &ParamSetter) + 'static + Send + Sync> {
+pub struct Interface<T: PluginImplementation, U: Fn(&dyn PluginImplementation, &mut Ui, &ParamSetter) + 'static + Send + Sync> {
     pub console: ConsoleReceiver,
     metadata: PluginMetadata,
-    params: Arc<T>,
+    implementation: Arc<T>,
+    params: Arc,
 
     center_draw: U,
 
@@ -33,12 +34,13 @@ pub struct Interface<T: Params + PluginParameters, U: Fn(&mut Ui, &ParamSetter) 
     themes: [mlem_egui_themes::Theme; 4],
 }
 
-impl<T: Params + PluginParameters, U: Fn(&mut Ui, &ParamSetter) + 'static + Send + Sync> Interface<T, U> {
-    pub fn new(metadata: PluginMetadata, params: Arc<T>, center_draw: U) -> Interface<T, U> {
+impl<T: PluginImplementation, U: Fn(&dyn PluginImplementation, &mut Ui, &ParamSetter) + 'static + Send + Sync> Interface<T, U> {
+    pub fn new(metadata: PluginMetadata, implementation: Arc<T>, center_draw: U) -> Interface<T, U> {
         return Self {
             console: ConsoleReceiver::new(),
             metadata, 
-            params: params,
+            implementation,
+            params: Arc<>::from(implementation.params()),
 
             center_draw,
 
@@ -165,7 +167,7 @@ impl<T: Params + PluginParameters, U: Fn(&mut Ui, &ParamSetter) + 'static + Send
     }
 
     fn draw_plugin(&mut self, ui: &mut Ui, setter: &ParamSetter) {
-        (self.center_draw)(ui, setter);
+        self.center_draw
     }
 
     fn draw_console(&mut self, ui: &mut Ui, setter: &ParamSetter, hash: impl Hash) {        

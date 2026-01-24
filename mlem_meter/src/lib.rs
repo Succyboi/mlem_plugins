@@ -72,58 +72,60 @@ impl PluginParameters for MeterParams {
     fn run_ms(&self) -> &AtomicF32 { &self.run_ms }
 }
 
-impl Meter { }
+impl Meter {
+    // TODO move to trait implementation.
 
-impl PluginImplementation for Meter {
-    fn metadata() -> PluginMetadata {
-        return PLUGIN_METADATA;
-    }
-
-    fn params(&self) -> Arc<dyn PluginParameters> {
-        return self.params.clone();
-    }
-
-    fn interface_center(&self) -> impl Fn(&mut Ui, &ParamSetter) + 'static + Send + Sync {
-        return |ui, setter| {
+    fn interface_center(&self) -> impl Fn(&Meter, &mut Ui, &ParamSetter)  + 'static + Send + Sync {
+        return move |meter: &Meter, ui, setter: &ParamSetter| {
             parameter_grid(ui, "Meters", |ui| {
                 parameter_label(ui, "Integrated", "Loudness total since reset.", |ui| {
-                    ui.monospace(format!("{: >6.2} lufs", self.params.lufs_global_loudness.load(Ordering::Relaxed)));
+                    ui.monospace(format!("{: >6.2} lufs", meter.params.lufs_global_loudness.load(Ordering::Relaxed)));
                 });
 
                 parameter_label(ui, "Momentary", "Loudness over a duration of 0.4 seconds.", |ui| {
-                    ui.monospace(format!("{: >6.2} lufs", self.params.lufs_momentary_loudness.load(Ordering::Relaxed)));
+                    ui.monospace(format!("{: >6.2} lufs", meter.params.lufs_momentary_loudness.load(Ordering::Relaxed)));
                 });
 
                 parameter_label(ui, "Short Term", "Loudness over a duration of 3 seconds.", |ui| {
-                    ui.monospace(format!("{: >6.2} lufs", self.params.lufs_shortterm_loudness.load(Ordering::Relaxed)));
+                    ui.monospace(format!("{: >6.2} lufs", meter.params.lufs_shortterm_loudness.load(Ordering::Relaxed)));
                 });
 
                 parameter_label(ui, "Range", "Loudness range total since reset.", |ui| {
-                    ui.monospace(format!("{: >6.2} lufs", self.params.lufs_range_loudness.load(Ordering::Relaxed)));
+                    ui.monospace(format!("{: >6.2} lufs", meter.params.lufs_range_loudness.load(Ordering::Relaxed)));
                 });
             });
             
             ui.add_space(ui.available_height() - 12.0);
             ui.horizontal(|ui| {
-                let seconds = self.params.active_time_ms.load(Ordering::Relaxed) / 1000.0;
+                let seconds = meter.params.active_time_ms.load(Ordering::Relaxed) / 1000.0;
                 let minutes = f32::floor(seconds / 60.0);
                 
                 if ui.button("Reset").clicked() {
-                    self.params.reset_meter.store(true, Ordering::Relaxed);
+                    meter.params.reset_meter.store(true, Ordering::Relaxed);
                 }
                 ui.monospace(format!("{minutes: >1.0}m{seconds: >1.0}s", minutes = minutes, seconds = seconds - minutes * 60.0));
                 
                 ui.with_layout(Layout::right_to_left(Align::BOTTOM), |ui| {
-                    let mut reset_on_play_value = self.params.reset_on_play.value();
+                    let mut reset_on_play_value = meter.params.reset_on_play.value();
             
                     if ui.checkbox(&mut reset_on_play_value, "Reset On Play").clicked() {
-                        setter.begin_set_parameter(&self.params.reset_on_play);
-                        setter.set_parameter(&self.params.reset_on_play, reset_on_play_value);
-                        setter.end_set_parameter(&self.params.reset_on_play);
+                        setter.begin_set_parameter(&meter.params.reset_on_play);
+                        setter.set_parameter(&meter.params.reset_on_play, reset_on_play_value);
+                        setter.end_set_parameter(&meter.params.reset_on_play);
                     }
                 });
             });
         };
+    }
+}
+
+impl PluginImplementation for Meter {
+    fn metadata(&self) -> PluginMetadata {
+        return PLUGIN_METADATA;
+    }
+
+    fn params(&self) -> Arc<dyn PluginParameters> {
+        return self.params.clone();
     }
 }
 
@@ -159,7 +161,7 @@ impl Plugin for Meter {
     fn editor(&mut self, _async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
         let editor_state = self.params.editor_state.clone();
         let params = self.params.clone();
-        let center_draw =  self.interface_center().clone();
+        let center_draw =  self.interface_center();
         let interface = Interface::new(consts::PLUGIN_METADATA, params, center_draw);
         
         self.runtime.console = Some(interface.console.create_sender());
