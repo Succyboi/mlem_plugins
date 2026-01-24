@@ -20,7 +20,7 @@ pub enum InterfaceCenterViewState {
     Plugin
 }
 
-pub struct Interface<T: Params + PluginParameters> {
+pub struct Interface<T: PluginParameters> {
     pub console: ConsoleReceiver,
     metadata: PluginMetadata,
     params: Arc<T>,
