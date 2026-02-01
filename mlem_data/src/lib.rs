@@ -3,13 +3,15 @@ pub mod runtime;
 
 use atomic_float::{ AtomicF32, AtomicF64 };
 use egui_file::FileDialog;
-use mlem_base::{interface::{interface_utils::{parameter_grid, parameter_label}, param_drag_value::ParamDragValue, param_toggle}, metadata::PluginMetadata, parameters::PluginParameters};
+use mlem_base::{console::ConsoleSender, interface::{self, interface_utils::{parameter_grid, parameter_label}, param_drag_value::ParamDragValue, param_toggle}, metadata::PluginMetadata, parameters::PluginParameters};
 use runtime::{ Runtime };
 use mlem_base::{ interface::{ Interface }, PluginImplementation };
 use nih_plug::prelude::*;
 use std::{ffi::OsStr, ops::Deref, path::{Path, PathBuf}, str::FromStr, sync::{ Arc, Mutex, atomic::{AtomicBool, AtomicUsize, Ordering} }};
-use nih_plug_egui::{EguiState, egui::{Align, Context, Layout, Ui}};
+use nih_plug_egui::{EguiState, egui::{Align, Context, Layout, Ui, Vec2}};
 use consts::PLUGIN_METADATA;
+
+pub const DATA_PREVIEW_SIZE: usize = 61 * 8;
 
 pub struct Meter {
     runtime: Runtime,
@@ -21,19 +23,19 @@ pub struct Meter {
 pub struct MeterParams {
     #[persist = "editor-state"] editor_state: Arc<EguiState>,
     #[id = "mute"]              mute: BoolParam,
-    #[id = "test"]              test: FloatParam,
     
     sample_rate: AtomicF32,
     buffer_size: AtomicUsize,
     channels: AtomicUsize,
     run_ms: AtomicF32,
-
+    
     load_path: Mutex<Option<String>>,
+    data_preview: Mutex<[u8; DATA_PREVIEW_SIZE]>
 }
 
 pub struct MeterImplementation { 
     params: Arc<MeterParams>,
-    open_file_dialog: Option<FileDialog>
+    open_file_dialog: Mutex<FileDialog>
 }
 
 impl Default for Meter {
@@ -55,15 +57,14 @@ impl Default for MeterParams {
             editor_state: EguiState::from_size(PLUGIN_METADATA.window_width, PLUGIN_METADATA.window_height),
 
             mute: BoolParam::new("Mute", true),
-            test: FloatParam::new("Test", 0.0, FloatRange::Linear { min: 0.0, max: 1.0 })
-                .with_unit("dB"),
 
             sample_rate: AtomicF32::new(0.0),
             buffer_size: AtomicUsize::new(0),
             channels: AtomicUsize::new(0),
             run_ms: AtomicF32::new(0.0),
 
-            load_path: Mutex::from(None)
+            load_path: Mutex::from(None),
+            data_preview: Mutex::from([0; DATA_PREVIEW_SIZE])
         }
     }
 }
@@ -81,7 +82,10 @@ impl PluginImplementation<MeterParams> for MeterImplementation {
     fn new(params: Arc<MeterParams>) -> MeterImplementation {
         return Self {
             params: params.clone(),
-            open_file_dialog: None
+            open_file_dialog: Mutex::from(FileDialog::open_file(None)
+                .resizable(false)
+                .default_size(Vec2::new(PLUGIN_METADATA.window_width  as f32 - interface::DEFAULT_SPACE * 8.0, PLUGIN_METADATA.window_height as f32 / 2.0))
+                .show_rename(false))
         }
     }
 
@@ -96,28 +100,27 @@ impl PluginImplementation<MeterParams> for MeterImplementation {
     fn interface_build(&self, _ctx: &Context) { }
 
     fn interface_update_center(&self, ui: &mut Ui, _ctx: &Context, setter: &ParamSetter) {
-        ui.add(ParamDragValue::for_param(&self.params.test, setter));
+        ui.with_layout(Layout::bottom_up(Align::Min), |ui| {
+            ui.monospace(consts::DISCLAIMER);
+            ui.separator();
 
-        if (ui.button("Open")).clicked() {
-            let mut dialog = FileDialog::open_file(None);
-            dialog.open();
-            
-            self.open_file_dialog = Some(dialog);
-        }
-
-        if let Some(dialog) = &mut self.open_file_dialog {
-            if dialog.show(_ctx).selected() {
-                if let Some(path) = dialog.path() {
-                    let Ok(path) = String::from_str(&path.to_string_lossy());
-                    let mut load_path = self.params.load_path.lock().unwrap();
-                    *load_path = Some(path);
-                }
+            let data_preview = *self.params.data_preview.lock().unwrap();
+            let mut data_string = String::new();
+            for i in 0..data_preview.len() {
+                data_string.push_str(format!("{:02X?}", data_preview[i]).as_str());
             }
-        }
+            ui.monospace(data_string);
+        });
     }
 
-    fn interface_update_bar(&self, ui: &mut Ui, setter: &ParamSetter) {
-        // TODO make this a param drawer
+    fn interface_update_bar(&self, ui: &mut Ui, ctx: &Context, setter: &ParamSetter) {
+        self.bar_mute(ui, setter);
+        self.bar_open(ui, ctx);
+    }
+}
+
+impl MeterImplementation {
+    fn bar_mute(&self, ui: &mut Ui, setter: &ParamSetter) {
         let original_muted = self.params.mute.value();
         let mut muted = original_muted;
         ui.toggle_value(&mut muted, "Mute");
@@ -126,6 +129,21 @@ impl PluginImplementation<MeterParams> for MeterImplementation {
             setter.begin_set_parameter(&self.params.mute);
             setter.set_parameter(&self.params.mute, muted);
             setter.end_set_parameter(&self.params.mute);
+        }
+    }
+
+    fn bar_open(&self, ui: &mut Ui, ctx: &Context) {
+        let mut open_file_dialog = self.open_file_dialog.lock().unwrap();
+        if (ui.button("Open")).clicked() {
+            open_file_dialog.open();
+        }
+
+        if open_file_dialog.show(ctx).selected() {
+            if let Some(path) = open_file_dialog.path() {
+                let Ok(path) = String::from_str(&path.to_string_lossy());
+                let mut load_path = self.params.load_path.lock().unwrap();
+                *load_path = Some(path);
+            }
         }
     }
 }

@@ -8,8 +8,8 @@ use nih_plug::{ plugin, prelude::*, util::gain_to_db };
 use nih_plug_egui::{ EguiState, egui::{ self, Align, Context, Layout, Ui } };
 use crate::{ PluginImplementation, console::ConsoleReceiver, consts, interface::interface_utils::{help_label, parameter_grid, parameter_label}, metadata::PluginMetadata, parameters::PluginParameters };
 
-const DEFAULT_SPACE: f32 = 4.0;
-const LABEL_WIDTH: f32 = 64.0;
+pub const DEFAULT_SPACE: f32 = 4.0;
+pub const LABEL_WIDTH: f32 = 64.0;
 const TOP_ID: &str = "Top";
 const CONSOLE_MAIN_ID: &str = "Central/Console/Main";
 const CONSOLE_ICON: &str = "\u{E47E}";
@@ -96,7 +96,7 @@ impl<T: PluginImplementation<U>, U: PluginParameters> Interface<T, U> {
                 self.draw_about_button(ui);
                 //self.draw_darkmode_toggle(egui_ctx, ui); Not now, implement saving this n stuff
 
-                self.draw_plugin_bar(ui, setter);
+                self.draw_plugin_bar(ui, ctx, setter);
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Max), |ui| {
                     self.draw_console_toggle(ui);
@@ -171,8 +171,8 @@ impl<T: PluginImplementation<U>, U: PluginParameters> Interface<T, U> {
         self.implementation.interface_update_center(ui, ctx, setter);
     }
 
-    fn draw_plugin_bar(&mut self, ui: &mut Ui, setter: &ParamSetter) {
-        self.implementation.interface_update_bar(ui, setter);
+    fn draw_plugin_bar(&mut self, ui: &mut Ui, ctx: &Context, setter: &ParamSetter) {
+        self.implementation.interface_update_bar(ui, ctx, setter);
     }
 
     fn draw_console(&mut self, ui: &mut Ui, _setter: &ParamSetter, hash: impl Hash) {     

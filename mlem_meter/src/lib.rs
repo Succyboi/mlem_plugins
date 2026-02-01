@@ -122,7 +122,7 @@ impl PluginImplementation<MeterParams> for MeterImplementation {
         });
     }
 
-    fn interface_update_bar(&self, ui: &mut Ui, _setter: &ParamSetter) {
+    fn interface_update_bar(&self, ui: &mut Ui, _ctx: &Context, _setter: &ParamSetter) {
         let seconds = self.params.active_time_ms.load(Ordering::Relaxed) / 1000.0;
         let minutes = f32::floor(seconds / 60.0);
         

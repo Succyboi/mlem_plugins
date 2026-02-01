@@ -3,16 +3,19 @@ pub mod utils;
 use core::fmt;
 use std::fmt::format;
 use std::fs::File;
-use std::io::Read;
+use std::io::{self, Read};
+use std::os::unix::fs::FileExt;
 use std::{ fmt::Error, sync::atomic::Ordering };
 use mlem_base::console::ConsoleSender;
+use nih_plug_egui::egui::load;
 use crate::consts;
 use crate::{ MeterParams };
 use nih_plug::{ prelude::* };
 use utils::{ RMS, Timer };
 
-const MAX_BUFFER_SIZE: usize = 1 * 1024 * 1024; // 1 Megabyte
+const MAX_DATA_SIZE: usize = 1 * 1024 * 1024; // 1 Megabyte
 
+// TODO Figure out how to synthesize from bits
 pub struct Runtime {
     pub console: Option<ConsoleSender>,
 
@@ -21,8 +24,9 @@ pub struct Runtime {
     channels: usize,
     last_playing: bool,
 
-    file: Option<File>,
-    data: [u8; MAX_BUFFER_SIZE],
+    file_path: Option<String>,
+    file_offset: u64,
+    data: [u8; MAX_DATA_SIZE],
     data_len: usize,
     data_pos: usize,
 
@@ -39,8 +43,9 @@ impl Runtime {
             channels: 0,
             last_playing: false,
             
-            file: None,
-            data: [0; MAX_BUFFER_SIZE],
+            file_path: None,
+            file_offset: 0,
+            data: [0; MAX_DATA_SIZE],
             data_len: 0,
             data_pos: 0,
 
@@ -56,7 +61,7 @@ impl Runtime {
         let execute_timer = Timer::new();
         let execute_time = execute_timer.elapsed_ms();
 
-        self.update_buffer_from_array(consts::DEFAULT_DATA);
+        let _ = self.update_buffer_from_array(consts::DEFAULT_DATA);
         
         self.log(format!("Init in {:.2}ms.", execute_time));
     }
@@ -77,21 +82,27 @@ impl Runtime {
 
         let mut load_path = params.load_path.lock().unwrap();
         if let Some(path) = (*load_path).clone() {
-            self.file = match Self::load_file(&path) {
-                Ok(file) => {
-                    Some(file)
-                },
-                Err(_) => None
-            }
+            self.file_path = Some(path.clone());
+            self.file_offset = 0;
+            self.data_len = 0;
+            let _ = self.update_buffer_from_file();
         }
         *load_path = None;
 
+        let mut data_preview = params.data_preview.lock().unwrap();
+        let len = usize::min(self.data_len - self.data_pos, data_preview.len());
+        data_preview[0..len].clone_from_slice(&self.data[self.data_pos..(len + self.data_pos)]);
+
         for channel_samples in buffer.iter_samples() {                        
             for sample in channel_samples {
-                let value = self.data[self.data_pos] as f32 / u8::MAX as f32 * 2.0 - 0.5;
-                self.data_pos = (self.data_pos + 1) % self.data_len;
+                let raw = self.data[self.data_pos];
+                let value = raw as f32 / u8::MAX as f32 * 2.0 - 0.5;
+                self.data_pos = self.data_pos + 1;
 
-                // TODO keep loading from file
+                if self.data_pos >= self.data_len {
+                    let _ = self.update_buffer_from_file();
+                    self.data_pos = 0;
+                }
 
                 if params.mute.value() {
                     *sample = 0.0;
@@ -113,28 +124,25 @@ impl Runtime {
         params.run_ms.store(self.run_time.get(), Ordering::Relaxed);
     }
 
-    fn load_file(path: &String) -> std::io::Result<File> {
-        let file = File::open(path)?;
+    fn update_buffer_from_file(&mut self) -> std::io::Result<()> {
+        if let Some(file_path) = &self.file_path {
+            let file = File::open(file_path)?;
+            self.file_offset = (self.file_offset + self.data_len as u64) % file.metadata()?.len();
+            self.data_len = file.read_at(&mut self.data, self.file_offset)?;
+            self.data_pos = 0;
 
-        Ok(file)
-    }
-
-    fn update_buffer_from_file(mut self) -> std::io::Result<()> {
-        match self.file {
-            None => (),
-            Some(mut file) => {
-                self.buffer_size = file.read(&mut self.data)?;
-            }
+            self.log(format!("File read {bytes} bytes at {percent}%", bytes = self.data_len, percent = f32::floor(self.file_offset as f32 / file.metadata()?.len() as f32 * 100.0)));
         }
-
+        
         Ok(())
     }
 
     fn update_buffer_from_array(&mut self, array: &[u8]) -> std::io::Result<()> {
-        let len = usize::min(consts::DEFAULT_DATA.len(), MAX_BUFFER_SIZE);
+        let len = usize::min(array.len(), MAX_DATA_SIZE);
 
-        self.data[0..len].clone_from_slice(&consts::DEFAULT_DATA[0..len]);
+        self.data[0..len].clone_from_slice(&array[0..len]);
         self.data_len = len;
+        self.data_pos = 0;
 
         Ok(())
     }

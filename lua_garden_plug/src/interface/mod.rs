@@ -13,6 +13,7 @@ use interface_data::InterfaceData;
 use crate::{ consts, ConsoleReceiver, runtime::{library, workspace::Workspace}, LuaGardenParams, runtime::runtime_data::RuntimeState, RuntimeData };
 
 const DEFAULT_SPACE: f32 = 4.0;
+const BAR_HEIGHT: f32 = 20.0;
 const TOP_ID: &str = "Top";
 const BOTTOM_ID: &str = "Bottom";
 const DEFAULT_MENU_WIDTH: f32 = 128.0;
@@ -22,7 +23,6 @@ const CONSOLE_MAIN_ID: &str = "Central/Console/Main";
 const CONSOLE_HEIGHT: f32 = 128.0;
 const CONSOLE_PREVIEW_CHARS: usize = 40;
 const DRAFT_EDITOR_ID: &str = "Central/DraftEditor";
-const BAR_HEIGHT: f32 = 20.0;
 const LOAD_BUTTON_WIDTH: f32 = 64.0;
 
 pub struct Interface {

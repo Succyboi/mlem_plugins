@@ -20,8 +20,8 @@ pub const PLUGIN_METADATA: PluginMetadata = PluginMetadata::new(
     &[ClapFeature::AudioEffect, ClapFeature::Stereo], 
     &[Vst3SubCategory::Fx, Vst3SubCategory::Tools], 
 
-    256,
-    256
+    384,
+    384
 );
-
+pub const DISCLAIMER: &str = include_str!("../disclaimer.txt");
 pub const DEFAULT_DATA: &[u8; 10763] = include_bytes!("../default_data");
