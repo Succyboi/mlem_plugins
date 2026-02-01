@@ -4,7 +4,7 @@ authors = [
     "Puk Bruinsma / DJ ZITwerK <puk@mlemrecords.com>"
     ]
 homepage = "https://mlemrecords.com"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 description = "An audio meter."
 license-file = "LICENSE"

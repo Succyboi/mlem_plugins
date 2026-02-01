@@ -4,5 +4,6 @@ members = [
 
     "mlem_base",
 
-    "mlem_meter"
+    "mlem_meter",
+    "mlem_data"
 ]

@@ -8,7 +8,9 @@ Published builds contain CLAP, VST3 and Standalone versions.
 
 ## Includes
 
-- [mlem_meter](mlem_meter) 0.1.1 - An audio meter.
+- [mlem_base](mlem_base) 0.1.2 - A plugin base.
+- [mlem_egui_themes](mlem_base) 0.1.2 - An egui theming library.
+- [mlem_meter](mlem_meter) 0.1.2 - An audio meter.
     > Measures input according to the [LUFS](https://en.wikipedia.org/wiki/LUFS) standard.
     > 
     > ![mlem_meter](mlem_meter/preview.png)

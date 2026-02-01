@@ -1,5 +1,6 @@
 pub mod interface_utils;
 pub mod param_toggle;
+pub mod param_drag_value;
 
 use std::{ hash::Hash, sync::{ Arc, RwLock, atomic::Ordering } };
 use mlem_egui_themes::Theme;
@@ -62,21 +63,21 @@ impl<T: PluginImplementation<U>, U: PluginParameters> Interface<T, U> {
         return nih_plug_egui::create_egui_editor(
             editor_state,
             (),
-            move |egui_ctx, state| {
+            move |ctx, state| {
                 let interface = interface_lock_build.clone();
 
-                interface.write().unwrap().build_interface(egui_ctx, state);
+                interface.write().unwrap().build_interface(ctx, state);
             },
-            move |egui_ctx, setter, state| {
+            move |ctx, setter, state| {
                 let interface = interface_lock_update.clone();
 
-                interface.write().unwrap().draw_interface(egui_ctx, setter, state);
+                interface.write().unwrap().draw_interface(ctx, setter, state);
             },
         );
     }
 
-    fn build_interface(&mut self, egui_ctx: &Context, _state: &mut ()) {
-        mlem_egui_themes::set_theme(egui_ctx, self.get_theme());
+    fn build_interface(&mut self, ctx: &Context, _state: &mut ()) {
+        mlem_egui_themes::set_theme(ctx, self.get_theme());
 
         self.console.log(format!("Initializing {name} v{version}.", name = consts::NAME, version = consts::VERSION));
         self.console.log(format!(""));
@@ -86,11 +87,11 @@ impl<T: PluginImplementation<U>, U: PluginParameters> Interface<T, U> {
         self.console.log(format!("---"));
         self.console.log(format!(""));
 
-        self.implementation.interface_build();
+        self.implementation.interface_build(ctx);
     }
     
-    fn draw_interface(&mut self, egui_ctx: &Context, setter: &ParamSetter, _state: &mut ()) {    
-        egui::TopBottomPanel::top(TOP_ID).show(egui_ctx, |ui| {
+    fn draw_interface(&mut self, ctx: &Context, setter: &ParamSetter, _state: &mut ()) {    
+        egui::TopBottomPanel::top(TOP_ID).show(ctx, |ui| {
             ui.horizontal(|ui| {
                 self.draw_about_button(ui);
                 //self.draw_darkmode_toggle(egui_ctx, ui); Not now, implement saving this n stuff
@@ -104,8 +105,8 @@ impl<T: PluginImplementation<U>, U: PluginParameters> Interface<T, U> {
             });
         });
 
-        egui::CentralPanel::default().show(egui_ctx, |ui| {
-            self.draw_center(ui, setter);
+        egui::CentralPanel::default().show(ctx, |ui| {
+            self.draw_center(ui, ctx, setter);
         });
     }
     
@@ -158,23 +159,23 @@ impl<T: PluginImplementation<U>, U: PluginParameters> Interface<T, U> {
         }
     }
 
-    fn draw_center(&mut self, ui: &mut Ui, setter: &ParamSetter) {
+    fn draw_center(&mut self, ui: &mut Ui, ctx: &Context, setter: &ParamSetter) {
         match self.center_view {
             InterfaceCenterViewState::About => self.draw_about(ui),
             InterfaceCenterViewState::Console => self.draw_console(ui, setter, CONSOLE_MAIN_ID),
-            InterfaceCenterViewState::Plugin => self.draw_plugin_center(ui, setter),
+            InterfaceCenterViewState::Plugin => self.draw_plugin_center(ui, ctx, setter),
         }
     }
 
-    fn draw_plugin_center(&mut self, ui: &mut Ui, setter: &ParamSetter) {
-        self.implementation.interface_update_center(ui, setter);
+    fn draw_plugin_center(&mut self, ui: &mut Ui, ctx: &Context, setter: &ParamSetter) {
+        self.implementation.interface_update_center(ui, ctx, setter);
     }
 
     fn draw_plugin_bar(&mut self, ui: &mut Ui, setter: &ParamSetter) {
         self.implementation.interface_update_bar(ui, setter);
     }
 
-    fn draw_console(&mut self, ui: &mut Ui, setter: &ParamSetter, hash: impl Hash) {     
+    fn draw_console(&mut self, ui: &mut Ui, _setter: &ParamSetter, hash: impl Hash) {     
         let params = self.implementation.params();
 
         ui.vertical(|ui| {

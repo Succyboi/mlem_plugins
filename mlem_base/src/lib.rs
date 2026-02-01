@@ -6,7 +6,7 @@ pub mod consts;
 
 use crate::{interface::Interface, metadata::PluginMetadata, parameters::PluginParameters};
 use std::sync::Arc;
-use nih_plug_egui::{ egui::{ Ui } };
+use nih_plug_egui::egui::{ Context, Ui };
 use nih_plug::{context::gui::ParamSetter, params::Params};
 
 // NOTE FOR FUTURE SELF
@@ -18,7 +18,7 @@ pub trait PluginImplementation<T: PluginParameters>: 'static + Send + Sync  {
     fn metadata(&self) -> PluginMetadata;
     fn params(&self) ->  Arc<T>;
     
-    fn interface_build(&self);
-    fn interface_update_center(&self, ui: &mut Ui, setter: &ParamSetter);
+    fn interface_build(&self, ctx: &Context);
+    fn interface_update_center(&self, ui: &mut Ui, ctx: &Context, setter: &ParamSetter);
     fn interface_update_bar(&self, ui: &mut Ui, setter: &ParamSetter);
 }

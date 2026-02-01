@@ -1,2 +1,5 @@
 [mlem_meter]
 name = "Mlem Meter"
+
+[mlem_data]
+name = "Mlem Data"

@@ -1,12 +1,12 @@
 [package]
-name = "mlem_base"
+name = "mlem_data"
 authors = [
     "Puk Bruinsma / DJ ZITwerK <puk@mlemrecords.com>"
     ]
 homepage = "https://mlemrecords.com"
-version = "0.1.2"
+version = "0.1.0"
 edition = "2021"
-description = "The base for Mlem audio plugins."
+description = "A raw data synthesizer."
 license-file = "LICENSE"
 
 [lib]
@@ -17,5 +17,6 @@ path = "src/lib.rs"
 nih_plug = { git = "https://github.com/robbert-vdh/nih-plug", features = ["standalone", "vst3"] }
 nih_plug_egui = { git = "https://github.com/robbert-vdh/nih-plug" }
 atomic_float = "1.1.0"
+egui_file = "0.22.1"
 mlem_egui_themes = { path = "../mlem_egui_themes" }
-parking_lot = "0.12"
+mlem_base = { path = "../mlem_base" }

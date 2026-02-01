@@ -1,7 +1,8 @@
-use std::hash::Hash;
+use nih_plug::prelude::{FloatRange, Param};
+use nih_plug_egui::egui::{self, Align, Grid, Layout, RichText, Ui, Vec2, WidgetText, Response, DragValue};
+use crate::interface::param_drag_value::ParamDragValue;
 
-use nih_plug_egui::egui::{self, Align, Grid, Layout, RichText, Ui, Vec2, WidgetText};
-
+pub const HOVER_HASH: &str = "HOVER";
 pub const TOOLTIP_HOVER_WIDTH: f32 = 256.0;
 pub const GRID_SPACING: f32 = 4.0;
 
@@ -41,4 +42,27 @@ pub fn parameter_label(ui: &mut Ui, text: impl Into<WidgetText>, tooltip_text: i
 
     ui.horizontal(add_contents);
     ui.end_row();
+}
+
+pub fn param_info<P: Param>(ui: &mut Ui, param: &P) {
+    ui.set_max_width(TOOLTIP_HOVER_WIDTH);
+    ui.label(format!("{name} ({unit})", name = param.name(), unit = param.unit()));
+
+    parameter_grid(ui, HOVER_HASH, |ui| {
+        ui.label("Value");
+        ui.monospace(param.normalized_value_to_string(param.modulated_normalized_value(), true));
+        ui.end_row();
+
+        ui.label("Min");
+        ui.monospace(param.normalized_value_to_string(0.0, true));
+        ui.end_row();
+
+        ui.label("Max");
+        ui.monospace(param.normalized_value_to_string(1.0, true));
+        ui.end_row();
+
+        ui.label("Default");
+        ui.monospace(param.normalized_value_to_string(param.default_normalized_value(), true));
+        ui.end_row();
+    });
 }

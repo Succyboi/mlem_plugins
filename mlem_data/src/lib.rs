@@ -2,11 +2,12 @@ pub mod consts;
 pub mod runtime;
 
 use atomic_float::{ AtomicF32, AtomicF64 };
-use mlem_base::{interface::{interface_utils::{parameter_grid, parameter_label}, param_toggle}, metadata::PluginMetadata, parameters::PluginParameters};
+use egui_file::FileDialog;
+use mlem_base::{interface::{interface_utils::{parameter_grid, parameter_label}, param_drag_value::ParamDragValue, param_toggle}, metadata::PluginMetadata, parameters::PluginParameters};
 use runtime::{ Runtime };
 use mlem_base::{ interface::{ Interface }, PluginImplementation };
 use nih_plug::prelude::*;
-use std::{ops::Deref, sync::{ Arc, atomic::{AtomicBool, AtomicUsize, Ordering} }};
+use std::{ffi::OsStr, ops::Deref, path::{Path, PathBuf}, str::FromStr, sync::{ Arc, Mutex, atomic::{AtomicBool, AtomicUsize, Ordering} }};
 use nih_plug_egui::{EguiState, egui::{Align, Context, Layout, Ui}};
 use consts::PLUGIN_METADATA;
 
@@ -19,23 +20,20 @@ pub struct Meter {
 #[derive(Params)]
 pub struct MeterParams {
     #[persist = "editor-state"] editor_state: Arc<EguiState>,
-    #[id = "reset_on_play"]     reset_on_play: BoolParam,
+    #[id = "mute"]              mute: BoolParam,
+    #[id = "test"]              test: FloatParam,
     
     sample_rate: AtomicF32,
     buffer_size: AtomicUsize,
     channels: AtomicUsize,
     run_ms: AtomicF32,
-    
-    reset_meter: AtomicBool,
-    active_time_ms: AtomicF32,
-    lufs_global_loudness: AtomicF64,
-    lufs_momentary_loudness: AtomicF64,
-    lufs_range_loudness: AtomicF64,
-    lufs_shortterm_loudness: AtomicF64
+
+    load_path: Mutex<Option<String>>,
 }
 
 pub struct MeterImplementation { 
-    params: Arc<MeterParams>
+    params: Arc<MeterParams>,
+    open_file_dialog: Option<FileDialog>
 }
 
 impl Default for Meter {
@@ -55,19 +53,17 @@ impl Default for MeterParams {
     fn default() -> Self {
         Self {
             editor_state: EguiState::from_size(PLUGIN_METADATA.window_width, PLUGIN_METADATA.window_height),
-            reset_on_play: BoolParam::new("Reset On Play", true),
 
-            reset_meter: AtomicBool::new(false),
+            mute: BoolParam::new("Mute", true),
+            test: FloatParam::new("Test", 0.0, FloatRange::Linear { min: 0.0, max: 1.0 })
+                .with_unit("dB"),
+
             sample_rate: AtomicF32::new(0.0),
             buffer_size: AtomicUsize::new(0),
             channels: AtomicUsize::new(0),
             run_ms: AtomicF32::new(0.0),
 
-            active_time_ms: AtomicF32::new(0.0),
-            lufs_global_loudness: AtomicF64::new(0.0),
-            lufs_momentary_loudness: AtomicF64::new(0.0),
-            lufs_range_loudness: AtomicF64::new(0.0),
-            lufs_shortterm_loudness: AtomicF64::new(0.0)
+            load_path: Mutex::from(None)
         }
     }
 }
@@ -84,7 +80,8 @@ impl Meter { }
 impl PluginImplementation<MeterParams> for MeterImplementation {
     fn new(params: Arc<MeterParams>) -> MeterImplementation {
         return Self {
-            params: params.clone()
+            params: params.clone(),
+            open_file_dialog: None
         }
     }
 
@@ -99,37 +96,37 @@ impl PluginImplementation<MeterParams> for MeterImplementation {
     fn interface_build(&self, _ctx: &Context) { }
 
     fn interface_update_center(&self, ui: &mut Ui, _ctx: &Context, setter: &ParamSetter) {
-        parameter_grid(ui, "Meters", |ui| {
-            parameter_label(ui, "Integrated", "Loudness total since reset.", |ui| {
-                ui.monospace(format!("{: >6.2} lufs", self.params.lufs_global_loudness.load(Ordering::Relaxed)));
-            });
+        ui.add(ParamDragValue::for_param(&self.params.test, setter));
 
-            parameter_label(ui, "Momentary", "Loudness over a duration of 0.4 seconds.", |ui| {
-                ui.monospace(format!("{: >6.2} lufs", self.params.lufs_momentary_loudness.load(Ordering::Relaxed)));
-            });
+        if (ui.button("Open")).clicked() {
+            let mut dialog = FileDialog::open_file(None);
+            dialog.open();
+            
+            self.open_file_dialog = Some(dialog);
+        }
 
-            parameter_label(ui, "Short Term", "Loudness over a duration of 3 seconds.", |ui| {
-                ui.monospace(format!("{: >6.2} lufs", self.params.lufs_shortterm_loudness.load(Ordering::Relaxed)));
-            });
-
-            parameter_label(ui, "Range", "Loudness range total since reset.", |ui| {
-                ui.monospace(format!("{: >6.2} lufs", self.params.lufs_range_loudness.load(Ordering::Relaxed)));
-            });
-
-            parameter_label(ui, "Reset On Play", "Resets metering when starting play.", |ui| {
-                ui.add(param_toggle::ParamToggle::for_param(&self.params.reset_on_play, setter));
-            });
-        });
+        if let Some(dialog) = &mut self.open_file_dialog {
+            if dialog.show(_ctx).selected() {
+                if let Some(path) = dialog.path() {
+                    let Ok(path) = String::from_str(&path.to_string_lossy());
+                    let mut load_path = self.params.load_path.lock().unwrap();
+                    *load_path = Some(path);
+                }
+            }
+        }
     }
 
-    fn interface_update_bar(&self, ui: &mut Ui, _setter: &ParamSetter) {
-        let seconds = self.params.active_time_ms.load(Ordering::Relaxed) / 1000.0;
-        let minutes = f32::floor(seconds / 60.0);
-        
-        if ui.button("Reset").clicked() {
-            self.params.reset_meter.store(true, Ordering::Relaxed);
+    fn interface_update_bar(&self, ui: &mut Ui, setter: &ParamSetter) {
+        // TODO make this a param drawer
+        let original_muted = self.params.mute.value();
+        let mut muted = original_muted;
+        ui.toggle_value(&mut muted, "Mute");
+
+        if muted != original_muted {
+            setter.begin_set_parameter(&self.params.mute);
+            setter.set_parameter(&self.params.mute, muted);
+            setter.end_set_parameter(&self.params.mute);
         }
-        ui.monospace(format!("{minutes: >1.0}m{seconds: >1.0}s", minutes = minutes, seconds = seconds - minutes * 60.0));    
     }
 }
 
