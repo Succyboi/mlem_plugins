@@ -1,15 +1,16 @@
-pub mod interface_utils;
-pub mod param_toggle;
+pub mod utils;
 pub mod param_drag_value;
+pub mod param_combo_box;
+pub mod param_toggle;
 
 use std::{ hash::Hash, sync::{ Arc, RwLock, atomic::Ordering } };
 use mlem_egui_themes::Theme;
 use nih_plug::{ plugin, prelude::*, util::gain_to_db };
 use nih_plug_egui::{ EguiState, egui::{ self, Align, Context, Layout, Ui } };
-use crate::{ PluginImplementation, console::ConsoleReceiver, consts, interface::interface_utils::{help_label, parameter_grid, parameter_label}, metadata::PluginMetadata, parameters::PluginParameters };
+use crate::{ PluginImplementation, console::ConsoleReceiver, consts, interface::utils::{help_label, parameter_grid, parameter_label}, metadata::PluginMetadata, parameters::PluginParameters };
 
 pub const DEFAULT_SPACE: f32 = 4.0;
-pub const LABEL_WIDTH: f32 = 64.0;
+pub const PARAM_WIDTH: f32 = 48.0;
 const TOP_ID: &str = "Top";
 const CONSOLE_MAIN_ID: &str = "Central/Console/Main";
 const CONSOLE_ICON: &str = "\u{E47E}";

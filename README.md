@@ -14,9 +14,12 @@ Published builds contain CLAP, VST3 and Standalone versions.
     > Measures input according to the [LUFS](https://en.wikipedia.org/wiki/LUFS) standard.
     > 
     > ![mlem_meter](mlem_meter/preview.png)
+- [mlem_data](mlem_data) 0.1.0 - A raw data synthesizer.
+    > Takes files as input, outputs audio.
+    > 
+    > ![mlem_data](mlem_data/preview.png)
 - [lua_garden_plug](lua_garden_plug) - Total WIP.
 - mlem_dynrange - TBM - A manual linear dynamic range remapper. 
-- mlem_data - TBM - A file to audio converter.
 
 ## Building
 

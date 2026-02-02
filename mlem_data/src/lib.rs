@@ -1,9 +1,10 @@
 pub mod consts;
 pub mod runtime;
+pub mod read_mode;
 
 use atomic_float::{ AtomicF32, AtomicF64 };
 use egui_file::FileDialog;
-use mlem_base::{console::ConsoleSender, interface::{self, interface_utils::{parameter_grid, parameter_label}, param_drag_value::ParamDragValue, param_toggle}, metadata::PluginMetadata, parameters::PluginParameters};
+use mlem_base::{console::ConsoleSender, interface::{self, param_combo_box, param_drag_value::ParamDragValue, param_toggle, utils::{parameter_grid, parameter_label, toggle_value}}, metadata::PluginMetadata, parameters::PluginParameters};
 use runtime::{ Runtime };
 use mlem_base::{ interface::{ Interface }, PluginImplementation };
 use nih_plug::prelude::*;
@@ -11,7 +12,9 @@ use std::{ffi::OsStr, ops::Deref, path::{Path, PathBuf}, str::FromStr, sync::{ A
 use nih_plug_egui::{EguiState, egui::{Align, Context, Layout, Ui, Vec2}};
 use consts::PLUGIN_METADATA;
 
-pub const DATA_PREVIEW_SIZE: usize = 61 * 8;
+use crate::read_mode::DataReadMode;
+
+pub const DATA_PREVIEW_SIZE: usize = 61 * 7;
 
 pub struct Meter {
     runtime: Runtime,
@@ -23,6 +26,8 @@ pub struct Meter {
 pub struct MeterParams {
     #[persist = "editor-state"] editor_state: Arc<EguiState>,
     #[id = "mute"]              mute: BoolParam,
+    #[id = "mono"]              mono: BoolParam,
+    #[id = "read-mode"]         read_mode: EnumParam<DataReadMode>,
     
     sample_rate: AtomicF32,
     buffer_size: AtomicUsize,
@@ -57,6 +62,8 @@ impl Default for MeterParams {
             editor_state: EguiState::from_size(PLUGIN_METADATA.window_width, PLUGIN_METADATA.window_height),
 
             mute: BoolParam::new("Mute", true),
+            mono: BoolParam::new("Mono", false),
+            read_mode: EnumParam::new("Read Mode", DataReadMode::Bit8),
 
             sample_rate: AtomicF32::new(0.0),
             buffer_size: AtomicUsize::new(0),
@@ -100,6 +107,11 @@ impl PluginImplementation<MeterParams> for MeterImplementation {
     fn interface_build(&self, _ctx: &Context) { }
 
     fn interface_update_center(&self, ui: &mut Ui, _ctx: &Context, setter: &ParamSetter) {
+        ui.horizontal(|ui| {
+            ui.add(param_toggle::ParamToggle::for_param(&self.params.mono, setter, "Mono", "Stereo"));
+            ui.add(param_combo_box::ParamComboBox::for_param(&self.params.read_mode, setter));
+        });
+        
         ui.with_layout(Layout::bottom_up(Align::Min), |ui| {
             ui.monospace(consts::DISCLAIMER);
             ui.separator();
@@ -110,6 +122,7 @@ impl PluginImplementation<MeterParams> for MeterImplementation {
                 data_string.push_str(format!("{:02X?}", data_preview[i]).as_str());
             }
             ui.monospace(data_string);
+            ui.separator();
         });
     }
 
@@ -121,15 +134,7 @@ impl PluginImplementation<MeterParams> for MeterImplementation {
 
 impl MeterImplementation {
     fn bar_mute(&self, ui: &mut Ui, setter: &ParamSetter) {
-        let original_muted = self.params.mute.value();
-        let mut muted = original_muted;
-        ui.toggle_value(&mut muted, "Mute");
-
-        if muted != original_muted {
-            setter.begin_set_parameter(&self.params.mute);
-            setter.set_parameter(&self.params.mute, muted);
-            setter.end_set_parameter(&self.params.mute);
-        }
+        ui.add(param_toggle::ParamToggle::for_param(&self.params.mute, setter, "Mute", "Mute"));
     }
 
     fn bar_open(&self, ui: &mut Ui, ctx: &Context) {

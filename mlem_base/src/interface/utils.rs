@@ -1,5 +1,5 @@
 use nih_plug::prelude::{FloatRange, Param};
-use nih_plug_egui::egui::{self, Align, Grid, Layout, RichText, Ui, Vec2, WidgetText, Response, DragValue};
+use nih_plug_egui::egui::{self, Align, DragValue, Grid, Layout, Response, RichText, Ui, Vec2, WidgetText, widgets};
 use crate::interface::param_drag_value::ParamDragValue;
 
 pub const HOVER_HASH: &str = "HOVER";
@@ -46,7 +46,11 @@ pub fn parameter_label(ui: &mut Ui, text: impl Into<WidgetText>, tooltip_text: i
 
 pub fn param_info<P: Param>(ui: &mut Ui, param: &P) {
     ui.set_max_width(TOOLTIP_HOVER_WIDTH);
-    ui.label(format!("{name} ({unit})", name = param.name(), unit = param.unit()));
+    if param.unit().is_empty() { 
+        ui.label(format!("{name}", name = param.name()));
+    } else { 
+        ui.label(format!("{name} ({unit})", name = param.name(), unit = param.unit()));
+    };
 
     parameter_grid(ui, HOVER_HASH, |ui| {
         ui.label("Value");
@@ -65,4 +69,14 @@ pub fn param_info<P: Param>(ui: &mut Ui, param: &P) {
         ui.monospace(param.normalized_value_to_string(param.default_normalized_value(), true));
         ui.end_row();
     });
+}
+
+pub fn fill_seperator(ui: &mut Ui) {
+    let available_size = ui.available_size();
+    
+    if available_size.x <= 0.0 {
+        return;
+    }
+
+    ui.add_sized(available_size, widgets::Separator::default().horizontal());
 }

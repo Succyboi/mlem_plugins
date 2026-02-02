@@ -1,5 +1,3 @@
-pub mod utils;
-
 use core::fmt;
 use std::fmt::format;
 use std::fs::File;
@@ -11,7 +9,7 @@ use nih_plug_egui::egui::load;
 use crate::consts;
 use crate::{ MeterParams };
 use nih_plug::{ prelude::* };
-use utils::{ RMS, Timer };
+use mlem_base::runtime::utils::{ self, RMS, Timer };
 
 const MAX_DATA_SIZE: usize = 1 * 1024 * 1024; // 1 Megabyte
 
@@ -61,7 +59,7 @@ impl Runtime {
         let execute_timer = Timer::new();
         let execute_time = execute_timer.elapsed_ms();
 
-        let _ = self.update_buffer_from_array(consts::DEFAULT_DATA);
+        let _ = self.update_data_from_array(consts::DEFAULT_DATA);
         
         self.log(format!("Init in {:.2}ms.", execute_time));
     }
@@ -83,9 +81,10 @@ impl Runtime {
         let mut load_path = params.load_path.lock().unwrap();
         if let Some(path) = (*load_path).clone() {
             self.file_path = Some(path.clone());
+            if let Err(err) = self.update_data_from_file() {
+                self.log(format!("Failed to load file at path \"{path}\": {err}"));
+            }
             self.file_offset = 0;
-            self.data_len = 0;
-            let _ = self.update_buffer_from_file();
         }
         *load_path = None;
 
@@ -93,15 +92,12 @@ impl Runtime {
         let len = usize::min(self.data_len - self.data_pos, data_preview.len());
         data_preview[0..len].clone_from_slice(&self.data[self.data_pos..(len + self.data_pos)]);
 
-        for channel_samples in buffer.iter_samples() {                        
-            for sample in channel_samples {
-                let raw = self.data[self.data_pos];
-                let value = raw as f32 / u8::MAX as f32 * 2.0 - 0.5;
-                self.data_pos = self.data_pos + 1;
+        for channel_samples in buffer.iter_samples() {          
+            let mut value = if params.mono.value() { self.next_data() } else { 0.0 };
 
-                if self.data_pos >= self.data_len {
-                    let _ = self.update_buffer_from_file();
-                    self.data_pos = 0;
+            for sample in channel_samples {
+                if !params.mono.value() {
+                    value = self.next_data();
                 }
 
                 if params.mute.value() {
@@ -124,10 +120,29 @@ impl Runtime {
         params.run_ms.store(self.run_time.get(), Ordering::Relaxed);
     }
 
-    fn update_buffer_from_file(&mut self) -> std::io::Result<()> {
+    fn next_data(&mut self) -> f32 {
+        let raw = self.data[self.data_pos];
+        let value = raw as f32 / u8::MAX as f32 * 2.0 - 0.5;
+        self.data_pos = self.data_pos + 1;
+
+        if self.data_pos >= self.data_len {
+            let _ = self.update_data_from_file();
+            self.data_pos = 0;
+        }
+        
+        return value;
+    }
+
+    fn update_data_from_file(&mut self) -> std::io::Result<()> {
         if let Some(file_path) = &self.file_path {
             let file = File::open(file_path)?;
-            self.file_offset = (self.file_offset + self.data_len as u64) % file.metadata()?.len();
+            let file_len = file.metadata()?.len();
+
+            if file_len == 0 {
+                return Err(std::io::Error::new(io::ErrorKind::Other, "File length is 0."));
+            }
+
+            self.file_offset = (self.file_offset + self.data_len as u64) % file_len;
             self.data_len = file.read_at(&mut self.data, self.file_offset)?;
             self.data_pos = 0;
 
@@ -137,7 +152,7 @@ impl Runtime {
         Ok(())
     }
 
-    fn update_buffer_from_array(&mut self, array: &[u8]) -> std::io::Result<()> {
+    fn update_data_from_array(&mut self, array: &[u8]) -> std::io::Result<()> {
         let len = usize::min(array.len(), MAX_DATA_SIZE);
 
         self.data[0..len].clone_from_slice(&array[0..len]);

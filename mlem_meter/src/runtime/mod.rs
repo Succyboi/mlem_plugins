@@ -1,5 +1,3 @@
-pub mod utils;
-
 use core::fmt;
 use std::{ fmt::Error, sync::atomic::Ordering };
 use mlem_base::console::ConsoleSender;
@@ -8,6 +6,7 @@ use crate::{ MeterParams };
 use nih_plug::{ prelude::* };
 use utils::{ RMS, Timer };
 use ebur128::{ EbuR128, Mode };
+use mlem_base::runtime::utils::{ self };
 
 pub struct Runtime {
     pub console: Option<ConsoleSender>,

@@ -24,4 +24,4 @@ pub const PLUGIN_METADATA: PluginMetadata = PluginMetadata::new(
     384
 );
 pub const DISCLAIMER: &str = include_str!("../disclaimer.txt");
-pub const DEFAULT_DATA: &[u8; 10763] = include_bytes!("../default_data");
+pub const DEFAULT_DATA: &[u8; 1061034] = include_bytes!("../default_data");

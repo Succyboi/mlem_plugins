@@ -5,7 +5,7 @@ use nih_plug_egui::egui::{
 };
 use nih_plug::{params::IntParam, prelude::{FloatParam, Param, ParamSetter}};
 
-use crate::interface::interface_utils::param_info;
+use crate::interface::{PARAM_WIDTH, utils::{self, param_info}};
 
 /// When shift+dragging a parameter, one pixel dragged corresponds to this much change in the
 /// noramlized parameter.
@@ -92,6 +92,8 @@ impl<'a, P: Param> ParamDragValue<'a, P> {
 impl Widget for ParamDragValue<'_, FloatParam> {
     fn ui(mut self, ui: &mut Ui) -> Response {
         ui.horizontal(|ui| {
+            ui.set_width(PARAM_WIDTH);
+
             // Allocate an automatic ID for keeping track of keyboard focus state
             // FIXME: There doesn't seem to be a way to generate IDs in the public API, not sure how
             //        you're supposed to do this
@@ -110,6 +112,7 @@ impl Widget for ParamDragValue<'_, FloatParam> {
                 .range(min..=max)
                 .max_decimals(MAX_DECIMALS)
             );
+            utils::fill_seperator(ui);
 
             let unit = self.param.unit();
             if self.draw_unit && !unit.is_empty() {
@@ -157,6 +160,7 @@ impl Widget for ParamDragValue<'_, IntParam> {
                 .range(min..=max)
                 .max_decimals(MAX_DECIMALS)
             );
+            utils::fill_seperator(ui);
 
             let unit = self.param.unit();
             if self.draw_unit && !unit.is_empty() {
