@@ -100,7 +100,7 @@ impl<T: PluginImplementation<U>, U: PluginParameters> Interface<T, U> {
                 self.draw_plugin_bar(ui, ctx, setter);
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Max), |ui| {
-                    self.draw_console_toggle(ui);
+                    self.draw_console_toggle(ui, ctx);
                     ui.separator();
                 });
             });
@@ -120,7 +120,7 @@ impl<T: PluginImplementation<U>, U: PluginParameters> Interface<T, U> {
         });
     }
 
-    fn draw_console_toggle(&mut self, ui: &mut Ui) {
+    fn draw_console_toggle(&mut self, ui: &mut Ui, ctx: &Context) {
         let console_updated = self.console.update();
 
         ui.horizontal(|ui| {
@@ -136,6 +136,10 @@ impl<T: PluginImplementation<U>, U: PluginParameters> Interface<T, U> {
                 } else {
                     InterfaceCenterViewState::Console
                 };
+            }
+
+            if button_response.secondary_clicked() {
+                utils::save_screenshot(ui, ctx);
             }
 
             if console_updated {

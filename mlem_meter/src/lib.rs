@@ -2,7 +2,7 @@ pub mod consts;
 pub mod runtime;
 
 use atomic_float::{ AtomicF32, AtomicF64 };
-use mlem_base::{interface::{interface_utils::{parameter_grid, parameter_label}, param_toggle}, metadata::PluginMetadata, parameters::PluginParameters};
+use mlem_base::{interface::{utils::{parameter_grid, parameter_label}, param_toggle}, metadata::PluginMetadata, parameters::PluginParameters};
 use runtime::{ Runtime };
 use mlem_base::{ interface::{ Interface }, PluginImplementation };
 use nih_plug::prelude::*;
