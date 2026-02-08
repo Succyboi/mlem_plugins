@@ -10,7 +10,7 @@ use nih_plug_egui::{ EguiState, egui::{ self, Align, Context, Layout, Ui } };
 use crate::{ PluginImplementation, console::ConsoleReceiver, consts, interface::utils::{help_label, parameter_grid, parameter_label}, metadata::PluginMetadata, parameters::PluginParameters };
 
 pub const DEFAULT_SPACE: f32 = 4.0;
-pub const PARAM_WIDTH: f32 = 48.0;
+pub const PARAM_WIDTH: f32 = 64.0;
 const TOP_ID: &str = "Top";
 const CONSOLE_MAIN_ID: &str = "Central/Console/Main";
 const CONSOLE_ICON: &str = "\u{E47E}";
@@ -94,15 +94,14 @@ impl<T: PluginImplementation<U>, U: PluginParameters> Interface<T, U> {
     fn draw_interface(&mut self, ctx: &Context, setter: &ParamSetter, _state: &mut ()) {    
         egui::TopBottomPanel::top(TOP_ID).show(ctx, |ui| {
             ui.horizontal(|ui| {
-                self.draw_about_button(ui);
+                ui.horizontal(|ui| {
+                    ui.set_max_width(PARAM_WIDTH);
+                    self.draw_about_button(ui);
+                    utils::fill_seperator_available(ui);
+                });
                 //self.draw_darkmode_toggle(egui_ctx, ui); Not now, implement saving this n stuff
 
                 self.draw_plugin_bar(ui, ctx, setter);
-
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Max), |ui| {
-                    self.draw_console_toggle(ui, ctx);
-                    ui.separator();
-                });
             });
         });
 
@@ -120,48 +119,46 @@ impl<T: PluginImplementation<U>, U: PluginParameters> Interface<T, U> {
         });
     }
 
-    fn draw_console_toggle(&mut self, ui: &mut Ui, ctx: &Context) {
+    fn draw_about_button(&mut self, ui: &mut Ui) {
         let console_updated = self.console.update();
 
-        ui.horizontal(|ui| {
-            let button_response = if self.center_view == InterfaceCenterViewState::Console {
+        let mut button_response = match self.center_view {
+            InterfaceCenterViewState::Plugin => {
+                ui.button(format!("{icon}", icon = self.metadata.icon))
+            }
+
+            InterfaceCenterViewState::About => {
+                ui.button(format!("{icon} Hide", icon = self.metadata.icon))
+            }
+
+            InterfaceCenterViewState::Console => {
                 ui.button(format!("{icon} Hide", icon = CONSOLE_ICON))
-            } else {
-                ui.button(CONSOLE_ICON)
-            };
-            
-            if button_response.clicked() {
-                self.center_view = if self.center_view == InterfaceCenterViewState::Console {
-                    InterfaceCenterViewState::Plugin
-                } else {
-                    InterfaceCenterViewState::Console
-                };
             }
-
-            if button_response.secondary_clicked() {
-                utils::save_screenshot(ui, ctx);
-            }
-
-            if console_updated {
-                button_response.highlight();
-            }
-        });
-    }
-
-    fn draw_about_button(&mut self, ui: &mut Ui) {
-        let button_response = if self.center_view == InterfaceCenterViewState::About {
-            ui.button(format!("{icon} Hide", icon = self.metadata.icon))
-        } else {
-            ui.button(format!("{icon}", icon = self.metadata.icon))
         };
 
         if button_response.clicked() {
-            self.center_view = if self.center_view == InterfaceCenterViewState::About {
+            self.center_view = if self.center_view != InterfaceCenterViewState::Plugin {
                 InterfaceCenterViewState::Plugin
             } else {
                 InterfaceCenterViewState::About
             };
         }
+
+        if button_response.secondary_clicked() {
+            if self.center_view != InterfaceCenterViewState::Console {
+                self.center_view = InterfaceCenterViewState::Console;
+            }
+        }
+
+        if console_updated {
+            button_response = button_response.highlight();
+        }
+
+        button_response.on_hover_ui(|ui| {
+            ui.set_max_width(utils::TOOLTIP_HOVER_WIDTH);
+            ui.monospace(format!("About {}.", self.metadata.name));
+            ui.monospace("Secondary click to show console.");
+        });
     }
 
     fn draw_center(&mut self, ui: &mut Ui, ctx: &Context, setter: &ParamSetter) {

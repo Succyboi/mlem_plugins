@@ -1,28 +1,14 @@
 use std::any::{Any, TypeId};
-
 use nih_plug_egui::egui::{
     self, DragValue, Key, Response, Sense, Stroke, TextEdit, TextStyle, Ui, Vec2, Widget, WidgetText, emath::{self, Float}, vec2
 };
 use nih_plug::{params::IntParam, prelude::{FloatParam, Param, ParamSetter}};
-
 use crate::interface::{PARAM_WIDTH, utils::{self, param_info}};
 
-/// When shift+dragging a parameter, one pixel dragged corresponds to this much change in the
-/// noramlized parameter.
-/// TODO use this
 const DRAG_SPEED_DEFAULT: f32 = 0.01;
 const DRAG_SPEED_GRANULAR: f32 = 0.0001;
 const MAX_DECIMALS: usize = 2;
 
-/// A slider widget similar to [`egui::widgets::Slider`] that knows about NIH-plug parameters ranges
-/// and can get values for it. The slider supports double click and control click to reset,
-/// shift+drag for granular dragging, text value entry by clicking on the value text.
-///
-/// TODO: Vertical orientation
-/// TODO: Check below for more input methods that should be added
-/// TODO: Decouple the logic from the drawing so we can also do things like nobs without having to
-///       repeat everything
-/// TODO: Add WidgetInfo annotations for accessibility
 #[must_use = "You should put this widget in an ui with `ui.add(widget);`"]
 pub struct ParamDragValue<'a, P: Param> {
     param: &'a P,
@@ -112,7 +98,7 @@ impl Widget for ParamDragValue<'_, FloatParam> {
                 .range(min..=max)
                 .max_decimals(MAX_DECIMALS)
             );
-            utils::fill_seperator(ui);
+            utils::fill_seperator_available(ui);
 
             let unit = self.param.unit();
             if self.draw_unit && !unit.is_empty() {
@@ -160,7 +146,7 @@ impl Widget for ParamDragValue<'_, IntParam> {
                 .range(min..=max)
                 .max_decimals(MAX_DECIMALS)
             );
-            utils::fill_seperator(ui);
+            utils::fill_seperator_available(ui);
 
             let unit = self.param.unit();
             if self.draw_unit && !unit.is_empty() {

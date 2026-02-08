@@ -2,18 +2,8 @@ use nih_plug_egui::{egui::{
     self, Response, SelectableLabel, Separator, Ui, Widget, WidgetText, vec2, widgets
 }};
 use nih_plug::{params::BoolParam, prelude::{Param, ParamSetter}};
-
 use crate::interface::{PARAM_WIDTH, utils::{self, param_info}};
 
-/// A slider widget similar to [`egui::widgets::Slider`] that knows about NIH-plug parameters ranges
-/// and can get values for it. The slider supports double click and control click to reset,
-/// shift+drag for granular dragging, text value entry by clicking on the value text.
-///
-/// TODO: Vertical orientation
-/// TODO: Check below for more input methods that should be added
-/// TODO: Decouple the logic from the drawing so we can also do things like nobs without having to
-///       repeat everything
-/// TODO: Add WidgetInfo annotations for accessibility
 #[must_use = "You should put this widget in an ui with `ui.add(widget);`"]
 pub struct ParamToggle<'a, P: Param> {
     param: &'a P,
@@ -88,7 +78,7 @@ impl Widget for ParamToggle<'_, BoolParam> {
             let mut bool_value = original_value;
             let text = if bool_value { self.true_str } else { self.false_str };
             let response = ui.toggle_value(&mut bool_value, text);
-            utils::fill_seperator(ui);
+            utils::fill_seperator_available(ui); // TODO fix to max width based on content
             
             if original_value != bool_value {
                 self.begin_drag();

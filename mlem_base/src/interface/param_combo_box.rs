@@ -2,18 +2,9 @@ use nih_plug_egui::{egui::{
     self, Response, SelectableLabel, Separator, Ui, Widget, WidgetText, vec2, widgets
 }};
 use nih_plug::{params::{BoolParam, EnumParam, enums::EnumParamInner}, prelude::{Enum, Param, ParamSetter}};
-
 use crate::interface::{PARAM_WIDTH, utils::{self, param_info}};
 
-/// A slider widget similar to [`egui::widgets::Slider`] that knows about NIH-plug parameters ranges
-/// and can get values for it. The slider supports double click and control click to reset,
-/// shift+drag for granular dragging, text value entry by clicking on the value text.
-///
-/// TODO: Vertical orientation
-/// TODO: Check below for more input methods that should be added
-/// TODO: Decouple the logic from the drawing so we can also do things like nobs without having to
-///       repeat everything
-/// TODO: Add WidgetInfo annotations for accessibility
+// TODO Doesn't respect param width
 #[must_use = "You should put this widget in an ui with `ui.add(widget);`"]
 pub struct ParamComboBox<'a, P: Param> {
     param: &'a P,
@@ -82,7 +73,7 @@ impl<T: Enum + PartialEq> Widget for ParamComboBox<'_, EnumParam<T>> {
                     }
                 }
             ).response;
-            utils::fill_seperator(ui);
+            utils::fill_seperator_available(ui);
 
             if value != original_value {
                 if let Some(value) = self.param.string_to_normalized_value(&value) {
